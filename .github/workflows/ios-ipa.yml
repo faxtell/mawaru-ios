@@ -1,0 +1,61 @@
+name: Build unsigned iOS IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mawaru-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build without code signing
+        run: |
+          set -euo pipefail
+          xcodebuild -project Mawaru.xcodeproj \
+            -scheme Mawaru \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/Mawaru.app"
+          test -d "$APP"
+          mkdir -p "$RUNNER_TEMP/Payload" dist
+          ditto "$APP" "$RUNNER_TEMP/Payload/Mawaru.app"
+          (cd "$RUNNER_TEMP" && zip -qry "$GITHUB_WORKSPACE/dist/Mawaru-unsigned.ipa" Payload)
+          unzip -l "$GITHUB_WORKSPACE/dist/Mawaru-unsigned.ipa" | head -20
+          shasum -a 256 "$GITHUB_WORKSPACE/dist/Mawaru-unsigned.ipa"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mawaru-unsigned-IPA
+          path: dist/Mawaru-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
