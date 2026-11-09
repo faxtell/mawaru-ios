@@ -143,6 +143,7 @@ enum DiaryStyle {
 @main struct MawaruApp: App {
     @StateObject private var store = DiaryStore()
     @StateObject private var shared = SharedDiaryStore()
+    @StateObject private var nearby = NearbyDiaryService()
     init() {
         DiaryFonts.register()
     }
@@ -151,8 +152,8 @@ enum DiaryStyle {
             TabView {
                 NavigationStack { HomeScreen() }
                     .tabItem { Label("日記帳", systemImage: "books.vertical.fill") }
-                NavigationStack { SharedHomeScreen() }
-                    .tabItem { Label("共有", systemImage: "person.2.fill") }
+                NavigationStack { ExchangeHubScreen() }
+                    .tabItem { Label("交換", systemImage: "arrow.left.arrow.right.circle.fill") }
                 NavigationStack { MemoriesScreen() }
                     .tabItem { Label("思い出", systemImage: "heart.text.square") }
                 NavigationStack { SettingsScreen() }
@@ -161,6 +162,23 @@ enum DiaryStyle {
             .tint(DiaryStyle.ink)
             .environmentObject(store)
             .environmentObject(shared)
+            .environmentObject(nearby)
+            .onAppear { nearby.store = store }
+            .alert("近くの人から接続リクエスト", isPresented: Binding(
+                get: { nearby.incomingInvite != nil },
+                set: { if !$0 { nearby.answerInvitation(accept: false) } }
+            )) {
+                Button("接続する") { nearby.answerInvitation(accept: true) }
+                Button("断る", role: .cancel) {
+                    nearby.answerInvitation(accept: false)
+                }
+            } message: {
+                Text("\(nearby.incomingInvite?.peer.displayName ?? "近くのiPhone") と接続しますか？本人の端末か確認してから承認してください。")
+            }
+            .sheet(item: $nearby.incomingDiary) { offer in
+                NearbyIncomingDiarySheet(offer: offer)
+                    .environmentObject(nearby)
+            }
         }
     }
 }
@@ -178,7 +196,7 @@ struct BookCover: View {
                 Spacer()
             }.padding(.leading, 12)
             VStack(spacing: 8) {
-                Text("my secret diary")
+                Text("交換日記  ✦  MAWARU")
                     .font(.system(size: small ? 8 : 10, weight: .black, design: .rounded))
                 Image(systemName: "heart.text.square.fill").font(small ? .title3 : .largeTitle)
                 Text(book.title).font(.system(size: small ? 12 : 17, weight: .bold, design: .rounded))
@@ -212,11 +230,19 @@ struct HomeScreen: View {
                             BookCover(book: book, small: true)
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(book.title).font(.headline).foregroundStyle(.primary)
-                                Text(book.paused ? "おやすみ中" : (book.isMyTurn ? "あなたの番です ✨" : "\(book.currentWriter)の番です"))
+                                Text(book.mode == "nearby" ?
+                                     (book.isMyTurn ? "📮 近くで渡せます" : "📮 \(book.currentWriter)の番") :
+                                     (book.paused ? "おやすみ中" :
+                                     (book.isMyTurn ? "あなたの番です ✨" : "\(book.currentWriter)の番です")))
                                     .font(.subheadline)
                                     .foregroundStyle(book.isMyTurn ? DiaryStyle.ink : .secondary)
                                 Text("\(store.pages(of: book.id).count)ページ・\(book.members.count)人")
                                     .font(.caption).foregroundStyle(.secondary)
+                                if book.mode == "nearby" {
+                                    Label("近距離交換", systemImage: "iphone.radiowaves.left.and.right")
+                                        .font(.caption2).foregroundStyle(DiaryStyle.ink)
+                                }
+
                             }
                             Spacer(minLength: 0)
                             Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
@@ -229,7 +255,7 @@ struct HomeScreen: View {
                     Label("あたらしい日記帳をつくる ♡", systemImage: "plus")
                         .font(.headline).frame(maxWidth: .infinity).padding(14)
                 }.buttonStyle(.borderedProminent).tint(DiaryStyle.ink)
-                Text("このタブは端末内デモです。別のiPhoneと交換するには「共有」タブを利用してください。")
+                Text("近くのiPhoneと直接渡すなら「交換」→「ちかく」。遠くの相手とオンラインで回すなら「交換」→「はなれて」を選んでね。")
                     .font(.footnote).foregroundStyle(.secondary)
             }.padding(20)
         }
@@ -242,14 +268,35 @@ struct HomeScreen: View {
 struct CreateBookScreen: View {
     @EnvironmentObject private var store: DiaryStore
     @Environment(\.dismiss) private var dismiss
+    var preferredMode = "demo"
     @State private var title = ""
     @State private var members = ["わたし", "あなた"]
     @State private var cover = 0
+    @State private var mode = "demo"
+
+    init(preferredMode: String = "demo") {
+        self.preferredMode = preferredMode
+        _mode = State(initialValue: preferredMode)
+    }
     var body: some View {
         NavigationStack {
             Form {
-                Section("日記帳の名前") {
-                    TextField("例：ふたりの交換日記", text: $title)
+                Section("交換する方法") {
+                    Picker("交換方法", selection: $mode) {
+                        Text("ちかくで交換").tag("nearby")
+                        Text("この端末で体験").tag("demo")
+                    }
+                    .pickerStyle(.segmented)
+                    Text(mode == "nearby"
+                         ? "実際に近くのiPhoneと接続して、日記のバトンを直接渡せます。"
+                         : "通信せずに、この端末の中でメンバーを切り替えて体験できます。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section("日記グループの名前") {
+                    TextField("例：ひみつの交換日記 ♡", text: $title)
+                        .textInputAutocapitalization(.never)
+                    Text("表紙やページの見出しにも、このグループ名が表示されます。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("表紙") {
                     HStack {
@@ -277,7 +324,9 @@ struct CreateBookScreen: View {
                     }
                 }
                 Section {
-                    Text("この日記帳は端末内で交換を試すモードです。実際の招待は「共有」タブから行えます。")
+                    Text(mode == "nearby"
+                         ? "グループのメンバーを順番に登録しよう。最初の担当は1人目。近距離交換ではメンバーの役割を端末に固定します。"
+                         : "体験モードでは、同じiPhoneでメンバーの役割を切り替えて日記を試せます。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -286,11 +335,13 @@ struct CreateBookScreen: View {
                 ToolbarItem(placement: .cancellationAction) { Button("キャンセル") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("作成") {
-                        store.addBook(title: title, members: members, cover: cover)
+                        store.addBook(title: title, members: members, cover: cover, mode: mode)
                         dismiss()
                     }
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                              members.contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }))
+                              members.contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) ||
+                              Set(members.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }).count != members.count ||
+                              title.count > 60)
                 }
             }
         }
@@ -311,7 +362,7 @@ struct BookScreen: View {
                         BookCover(book: book)
                         VStack(alignment: .leading, spacing: 7) {
                             Text(book.title).font(.title2.bold())
-                            Text("\(book.members.count)人でつづる交換日記")
+                            Text(book.mode == "nearby" ? "📮 ちかくで交換" : "📖 体験モード")
                                 .font(.subheadline).foregroundStyle(.secondary)
                             Text(book.paused ? "おやすみ中" : (book.isMyTurn ? "あなたの番です" : "\(book.currentWriter)の番です"))
                                 .font(.headline).foregroundStyle(DiaryStyle.ink)
@@ -319,7 +370,11 @@ struct BookScreen: View {
                         Spacer(minLength: 0)
                     }
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("バトンの順番").font(.headline)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("バトンの順番").font(.headline)
+                            Text("ページを書いたら、次のメンバーへ ♡")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         ScrollView(.horizontal) {
                             HStack(spacing: 12) {
                                 ForEach(book.members.indices, id: \.self) { i in
@@ -334,18 +389,26 @@ struct BookScreen: View {
                                 }
                             }
                         }
-                        Menu {
-                            ForEach(book.members.indices, id: \.self) { i in
-                                Button(book.members[i]) { store.setActive(bookID: bookID, index: i) }
+                        if book.mode == "demo" {
+                            Menu {
+                                ForEach(book.members.indices, id: \.self) { i in
+                                    Button(book.members[i]) { store.setActive(bookID: bookID, index: i) }
+                                }
+                            } label: {
+                                Label("操作する人：\(book.members[book.activeMemberIndex])（デモ）", systemImage: "person.crop.circle")
+                                    .font(.footnote)
                             }
-                        } label: {
-                            Label("操作する人：\(book.members[book.activeMemberIndex])（デモ）", systemImage: "person.crop.circle")
-                                .font(.footnote)
+                        } else {
+                            Label("📮 このiPhoneは \(book.members[book.activeMemberIndex]) の担当",
+                                  systemImage: "checkmark.seal")
+                                .font(.footnote).foregroundStyle(.secondary)
                         }
                     }.padding(16).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
                     if book.isMyTurn {
                         Button { editing = true } label: {
-                            Label("日記を書いて、次の人へ渡す", systemImage: "pencil.line")
+                            Label(book.mode == "nearby" ?
+                                  "日記を書いて近くの人に渡す" : "日記を書いて、次の人へ渡す",
+                                  systemImage: "pencil.line")
                                 .font(.headline).frame(maxWidth: .infinity).padding(14)
                         }.buttonStyle(.borderedProminent).tint(DiaryStyle.ink)
                     } else {
@@ -358,6 +421,11 @@ struct BookScreen: View {
                         Spacer()
                         Text("\(store.pages(of: bookID).count)ページ")
                             .foregroundStyle(.secondary)
+                    }
+                    if book.mode == "nearby" {
+                        Label("近くの交換では双方の端末で接続・受取を確認してから次の番になります。",
+                              systemImage: "lock.shield")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     if store.pages(of: bookID).isEmpty {
                         ContentUnavailableView("まだ白紙の一冊", systemImage: "text.book.closed",
@@ -402,17 +470,26 @@ struct BookScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if let book {
+                if let book, book.mode == "demo" {
                     Menu {
-                        Button("招待コード（デモ）", systemImage: "person.badge.plus") { showingDemoCode = true }
-                        Button(book.paused ? "再開する" : "おやすみする", systemImage: book.paused ? "play" : "pause") {
+                        Button("招待コード（デモ）", systemImage: "person.badge.plus") {
+                            showingDemoCode = true
+                        }
+                        Button(book.paused ? "再開する" : "おやすみする",
+                               systemImage: book.paused ? "play" : "pause") {
                             store.togglePause(bookID)
                         }
                     } label: { Image(systemName: "ellipsis.circle") }
                 }
             }
         }
-        .sheet(isPresented: $editing) { DiaryEditorScreen(bookID: bookID) }
+        .sheet(isPresented: $editing) {
+            if book?.mode == "nearby" {
+                NearbyDiaryEditorScreen(bookID: bookID)
+            } else {
+                DiaryEditorScreen(bookID: bookID)
+            }
+        }
         .alert("招待コード（デモ）", isPresented: $showingDemoCode) {
             Button("コピー") {
                 UIPasteboard.general.string = book?.demoCode
@@ -467,12 +544,16 @@ struct DiaryEditorScreen: View {
                             title: title, text: text,
                             author: store.books.first(where: { $0.id == bookID })?.currentWriter ?? "わたし",
                             date: .now, decoration: decoration,
-                            attachedPhoto: photo.flatMap { UIImage(data: $0) }
+                            attachedPhoto: photo.flatMap { UIImage(data: $0) },
+                            groupTitle: store.books.first(where: { $0.id == bookID })?.title ?? "交換日記",
+                            pageNumber: store.pages(of: bookID).count + 1
                         )
                     } else {
                         NostalgicNotebookEditor(
                             title: $title, text: $text, decoration: $decoration,
-                            author: store.books.first(where: { $0.id == bookID })?.currentWriter ?? "わたし"
+                            author: store.books.first(where: { $0.id == bookID })?.currentWriter ?? "わたし",
+                            groupTitle: store.books.first(where: { $0.id == bookID })?.title ?? "交換日記",
+                            pageNumber: store.pages(of: bookID).count + 1
                         )
                         .onChange(of: title) { _, _ in saveDraft() }
                         .onChange(of: text) { _, _ in saveDraft() }
@@ -488,6 +569,7 @@ struct DiaryEditorScreen: View {
                     }
                     .tint(DiaryStyle.ink)
                     .onChange(of: decoration) { _, _ in saveDraft() }
+                    DiaryWritingPromptPicker(text: $text)
                     MawaruSectionLabel(step: "03", title: "写真とシールでデコろう", symbol: "sparkles")
                     if let photo, let image = UIImage(data: photo) {
                         Image(uiImage: image).resizable().scaledToFit()
@@ -588,7 +670,11 @@ struct DiaryPageScreen: View {
                     NostalgicNotebookReadPage(
                         title: page.title, text: page.text, author: page.author,
                         date: page.date, decoration: page.decoration ?? DiaryDecoration(),
-                        attachedPhoto: store.image(for: page)
+                        attachedPhoto: store.image(for: page),
+                        groupTitle: store.books.first(where: { $0.id == page.bookID })?.title ?? "交換日記",
+                        pageNumber: store.pages(of: page.bookID).sorted {
+                            $0.date < $1.date
+                        }.firstIndex(where: { $0.id == page.id }).map { $0 + 1 }
                     )
                     Divider()
                     HStack {
@@ -706,7 +792,7 @@ struct SettingsScreen: View {
             }
             Section("アプリについて") {
                 LabeledContent("アプリ名", value: "まわる")
-                LabeledContent("バージョン", value: "0.7.0")
+                LabeledContent("バージョン", value: "0.8.0")
                 LabeledContent("ローカル日記", value: "このiPhone内")
             }
             Section("データ管理") {

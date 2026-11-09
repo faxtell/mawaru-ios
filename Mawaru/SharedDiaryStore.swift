@@ -18,6 +18,7 @@ struct SharedBook: Identifiable {
     let memberIDs: [String]
     let memberNames: [String]
     let currentTurn: Int
+    let lastSequence: Int
     let paused: Bool
     let updatedAt: Date
 
@@ -37,6 +38,7 @@ struct SharedBook: Identifiable {
         self.memberIDs = memberIDs
         self.memberNames = memberNames
         self.currentTurn = currentTurn
+        self.lastSequence = data["lastSequence"] as? Int ?? 0
         self.paused = data["paused"] as? Bool ?? false
         self.updatedAt = (data["updatedAt"] as? Timestamp)?.dateValue() ?? .distantPast
     }

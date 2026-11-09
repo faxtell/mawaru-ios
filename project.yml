@@ -18,6 +18,15 @@ targets:
   Mawaru:
     type: application
     platform: iOS
+    info:
+      path: Mawaru/Info.plist
+      properties:
+        CFBundleDisplayName: "まわる"
+        UILaunchScreen: {}
+        NSPhotoLibraryUsageDescription: "交換日記に写真を添付するために写真を選択します。"
+        NSLocalNetworkUsageDescription: "近くのiPhoneとつながり、交換日記を直接受け渡しするためにローカルネットワークを利用します。"
+        NSBonjourServices:
+          - "_mawaru-diary._tcp"
     sources:
       - path: Mawaru
     dependencies:
@@ -38,8 +47,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: 'まわる'
         INFOPLIST_KEY_UILaunchScreen_Generation: 'YES'
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: '交換日記に写真を添付するために写真を選択します。'
-        MARKETING_VERSION: 0.7.0
-        CURRENT_PROJECT_VERSION: 7
+        MARKETING_VERSION: 0.8.0
+        CURRENT_PROJECT_VERSION: 8
         GENERATE_INFOPLIST_FILE: YES
         SUPPORTS_MACCATALYST: NO
     scheme:

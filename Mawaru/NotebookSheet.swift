@@ -100,6 +100,8 @@ struct NostalgicNotebookPage<Content: View>: View {
     @Binding var decoration: DiaryDecoration
     var editing = false
     var cloudLocation: DiaryCloudPhotoLocation? = nil
+    var groupTitle = "交換日記"
+    var pageNumber: Int? = nil
     @ViewBuilder let content: () -> Content
     @State private var canvasSize = CGSize(width: 350, height: 480)
     @State private var dropTargeted = false
@@ -107,17 +109,39 @@ struct NostalgicNotebookPage<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Label("まわる diary", systemImage: "heart.text.square.fill")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                Spacer()
-                Text("secret ♡")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+            HStack(alignment: .center, spacing: 9) {
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(MawaruPastel.ink)
+                    .padding(8)
+                    .background(MawaruPastel.rose.opacity(0.34), in: RoundedRectangle(cornerRadius: 9))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(groupTitle)
+                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+                    Text("EXCHANGE DIARY  ✦  MAWARU")
+                        .font(.system(size: 8, weight: .medium, design: .rounded))
+                        .tracking(1)
+                }
+                Spacer(minLength: 5)
+                if let pageNumber {
+                    Text("P. (pageNumber)")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(MawaruPastel.lemon.opacity(0.87), in: Capsule())
+                } else {
+                    Image(systemName: "heart.fill").font(.caption)
+                }
             }
-            .foregroundStyle(MawaruPastel.ink.opacity(0.60))
-            .padding(.leading, 25)
-            .padding(.trailing, 6)
-            .padding(.bottom, 14)
+            .foregroundStyle(MawaruPastel.ink.opacity(0.88))
+            .padding(.bottom, 10)
+
+            Rectangle()
+                .fill(MawaruPastel.rose.opacity(0.40))
+                .frame(height: 1)
+                .padding(.bottom, 14)
 
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -126,7 +150,7 @@ struct NostalgicNotebookPage<Content: View>: View {
 
             HStack {
                 Spacer()
-                Text("little memories  ✦  keep forever")
+                Text("まわる ♡  きょうの気持ちを、次のページへ")
                     .font(.system(size: 10, weight: .medium, design: .serif))
                     .foregroundStyle(MawaruPastel.ink.opacity(0.45))
             }
@@ -222,9 +246,14 @@ struct NostalgicNotebookEditor: View {
     @Binding var decoration: DiaryDecoration
     var author = "わたし"
     var date = Date.now
+    var groupTitle = "交換日記"
+    var pageNumber: Int? = nil
 
     var body: some View {
-        NostalgicNotebookPage(decoration: $decoration, editing: true) {
+        NostalgicNotebookPage(
+            decoration: $decoration, editing: true,
+            groupTitle: groupTitle, pageNumber: pageNumber
+        ) {
             DiaryPageWritingContent(
                 title: $title, text: $text, decoration: decoration,
                 editable: true, author: author, date: date
@@ -241,12 +270,15 @@ struct NostalgicNotebookReadPage: View {
     var decoration: DiaryDecoration
     var attachedPhoto: UIImage? = nil
     var cloudLocation: DiaryCloudPhotoLocation? = nil
+    var groupTitle = "交換日記"
+    var pageNumber: Int? = nil
 
     var body: some View {
         VStack(spacing: 14) {
             NostalgicNotebookPage(
                 decoration: .constant(decoration),
-                editing: false, cloudLocation: cloudLocation
+                editing: false, cloudLocation: cloudLocation,
+                groupTitle: groupTitle, pageNumber: pageNumber
             ) {
                 DiaryPageWritingContent(
                     title: .constant(title.isEmpty ? "無題のページ ♡" : title),

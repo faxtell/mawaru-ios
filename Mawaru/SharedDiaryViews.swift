@@ -89,7 +89,7 @@ struct SharedHomeScreen: View {
                 .background(DiaryStyle.background.opacity(0.55))
             }
         }
-        .navigationTitle("共有日記")
+        .navigationTitle("はなれて交換")
         .sheet(isPresented: $creating) { SharedCreateScreen() }
         .sheet(isPresented: $joining) { SharedJoinScreen() }
         .alert("共有機能のエラー",
@@ -304,7 +304,8 @@ struct SharedBookScreen: View {
                                 decoration: page.decoration,
                                 cloudLocation: DiaryCloudPhotoLocation(
                                     bookID: bookID, entryID: page.id, authorID: page.authorID
-                                )
+                                ),
+                                groupTitle: book.title, pageNumber: page.sequence
                             )
                         }
                     }
@@ -419,12 +420,16 @@ struct SharedEditorScreen: View {
                         NostalgicNotebookReadPage(
                             title: title, text: bodyText,
                             author: shared.displayName,
-                            date: .now, decoration: decoration
+                            date: .now, decoration: decoration,
+                            groupTitle: shared.books.first(where: { $0.id == bookID })?.title ?? "交換日記",
+                            pageNumber: (shared.books.first(where: { $0.id == bookID })?.lastSequence ?? 0) + 1
                         )
                     } else {
                         NostalgicNotebookEditor(
                             title: $title, text: $bodyText, decoration: $decoration,
-                            author: shared.displayName
+                            author: shared.displayName,
+                            groupTitle: shared.books.first(where: { $0.id == bookID })?.title ?? "交換日記",
+                            pageNumber: (shared.books.first(where: { $0.id == bookID })?.lastSequence ?? 0) + 1
                         )
                         .onChange(of: title) { _, _ in saveDraft() }
                         .onChange(of: bodyText) { _, _ in saveDraft() }
@@ -440,6 +445,7 @@ struct SharedEditorScreen: View {
                     }
                     .tint(DiaryStyle.ink)
                     .onChange(of: decoration) { _, _ in saveDraft() }
+                    DiaryWritingPromptPicker(text: $bodyText)
                     MawaruSectionLabel(step: "03", title: "好きなシールを貼ろう", symbol: "sparkles")
                     DiaryDecorationEditor(decoration: $decoration, showsPreview: false)
                     Text("送信するとページは参加メンバー全員に公開され、順番が次の人に移ります。")
