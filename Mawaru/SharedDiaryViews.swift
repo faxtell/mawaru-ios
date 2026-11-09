@@ -40,8 +40,10 @@ struct SharedHomeScreen: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        Text("思い出を、ふたりから。")
-                            .font(.system(.largeTitle, design: .serif, weight: .bold))
+                        MawaruHomeHeader(
+                            headline: "ふたりで1冊、\nひみつの日記帳 ♡",
+                            subtitle: "ゆるく、かわいく。大切な人にバトンを渡そう。"
+                        )
                         Text("サインイン中：\(shared.displayName)")
                             .foregroundStyle(.secondary)
                         if shared.books.isEmpty {
@@ -69,7 +71,7 @@ struct SharedHomeScreen: View {
                                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
                                 }
                                 .padding(15)
-                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                                .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 22))
                             }.buttonStyle(.plain)
                         }
                         Button { creating = true } label: {
@@ -296,24 +298,14 @@ struct SharedBookScreen: View {
                         ContentUnavailableView("まだ白紙の一冊", systemImage: "book.closed")
                     } else {
                         ForEach(pages) { page in
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text(page.author)
-                                    Spacer()
-                                    Text(page.createdAt, style: .date)
-                                }.font(.caption).foregroundStyle(.secondary)
-                                Text(page.title.isEmpty ? "無題のページ" : page.title)
-                                    .font(.system(.title3, design: .serif, weight: .bold))
-                                DiaryStickerBoard(
-                                    decoration: .constant(page.decoration),
-                                    cloudLocation: DiaryCloudPhotoLocation(
-                                        bookID: bookID, entryID: page.id, authorID: page.authorID)
+                            NostalgicNotebookReadPage(
+                                title: page.title, text: page.body,
+                                author: page.author, date: page.createdAt,
+                                decoration: page.decoration,
+                                cloudLocation: DiaryCloudPhotoLocation(
+                                    bookID: bookID, entryID: page.id, authorID: page.authorID
                                 )
-                                Text(page.body).font(.body)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .padding(18)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                            )
                         }
                     }
                 }.padding(18)
@@ -407,29 +399,22 @@ struct SharedEditorScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 15) {
-                    Text(Date.now, format: .dateTime.year().month().day().weekday(.wide))
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    TextField("今日のタイトル", text: $title)
-                        .font(.system(.title2, design: .serif, weight: .bold))
+                    MawaruSectionLabel(step: "01", title: "きょうのノート", symbol: "pencil.and.scribble")
+                    NostalgicNotebookEditor(title: $title, text: $bodyText, decoration: $decoration)
                         .onChange(of: title) { _, _ in saveDraft() }
-                    Divider()
-                    TextEditor(text: $bodyText)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 270)
                         .onChange(of: bodyText) { _, _ in saveDraft() }
-                    DiaryDecorationEditor(decoration: $decoration)
                         .onChange(of: decoration) { _, _ in saveDraft() }
+                    MawaruSectionLabel(step: "02", title: "好きなシールを貼ろう", symbol: "sparkles")
+                    DiaryDecorationEditor(decoration: $decoration, showsPreview: false)
                     Text("送信するとページは参加メンバー全員に公開され、順番が次の人に移ります。")
                         .font(.footnote).foregroundStyle(.secondary)
                     Text("写真・コピーした画像も最大4枚まで貼れて、共有すると相手にも表示されます。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
-                .padding(20)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-                .padding(16)
+                .padding(18)
             }
             .background(DiaryStyle.background.opacity(0.55))
-            .navigationTitle("次のページ")
+            .navigationTitle("きょうの交換日記")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") { saveDraft(); dismiss() }

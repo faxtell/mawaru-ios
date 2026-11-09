@@ -120,14 +120,12 @@ final class DiaryStore: ObservableObject {
 }
 
 enum DiaryStyle {
-    static let background = Color(red: 0.98, green: 0.96, blue: 0.94)
-    static let ink = Color(red: 0.41, green: 0.32, blue: 0.29)
-    static let blush = Color(red: 0.94, green: 0.76, blue: 0.72)
+    static let background = MawaruPastel.background
+    static let ink = MawaruPastel.ink
+    static let blush = MawaruPastel.rose
     static let colors: [Color] = [
-        Color(red: 0.93, green: 0.66, blue: 0.63),
-        Color(red: 0.70, green: 0.78, blue: 0.67),
-        Color(red: 0.76, green: 0.74, blue: 0.89),
-        Color(red: 0.75, green: 0.82, blue: 0.89)
+        MawaruPastel.rose, MawaruPastel.mint,
+        MawaruPastel.lavender, MawaruPastel.lemon
     ]
 }
 
@@ -158,17 +156,20 @@ struct BookCover: View {
     var small = false
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 14).fill(DiaryStyle.colors[abs(book.cover) % DiaryStyle.colors.count])
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 4)
+            RoundedRectangle(cornerRadius: 17).fill(DiaryStyle.colors[abs(book.cover) % DiaryStyle.colors.count].gradient)
+                .overlay { RoundedRectangle(cornerRadius: 17).strokeBorder(.white.opacity(0.85), lineWidth: 2) }
+                .shadow(color: .black.opacity(0.10), radius: 7, y: 5)
             HStack(spacing: 0) {
                 Rectangle().fill(.white.opacity(0.28)).frame(width: 8)
                 Spacer()
             }.padding(.leading, 12)
             VStack(spacing: 8) {
-                Image(systemName: "heart.fill").font(small ? .title3 : .largeTitle)
-                Text(book.title).font(.system(size: small ? 12 : 17, weight: .semibold, design: .serif))
-                    .lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 10)
-            }.foregroundStyle(.white)
+                Text("my secret diary")
+                    .font(.system(size: small ? 8 : 10, weight: .black, design: .rounded))
+                Image(systemName: "heart.text.square.fill").font(small ? .title3 : .largeTitle)
+                Text(book.title).font(.system(size: small ? 12 : 17, weight: .bold, design: .rounded))
+                    .lineLimit(2).multilineTextAlignment(.center).padding(.horizontal, 8)
+            }.foregroundStyle(DiaryStyle.ink)
         }
         .frame(width: small ? 75 : 115, height: small ? 100 : 150)
         .accessibilityLabel("日記帳の表紙、\(book.title)")
@@ -181,12 +182,10 @@ struct HomeScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("今日の気持ちを、\n次のページへ。")
-                        .font(.system(.largeTitle, design: .serif, weight: .bold))
-                    Text("大切な人と、ゆっくりつづる交換日記。")
-                        .foregroundStyle(.secondary)
-                }.padding(.top, 14)
+                MawaruHomeHeader(
+                    headline: "今日のきもちを、\n次のページへ ♡",
+                    subtitle: "友だち・恋人と、ゆるっとつづる交換日記。"
+                ).padding(.top, 12)
                 if store.books.isEmpty {
                     ContentUnavailableView("まだ日記帳がありません", systemImage: "book.closed",
                         description: Text("まずは一冊、作ってみよう。"))
@@ -209,11 +208,11 @@ struct HomeScreen: View {
                             Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                         }
                         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+                        .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 23))
                     }.buttonStyle(.plain)
                 }
                 Button { creating = true } label: {
-                    Label("新しい日記帳を作る", systemImage: "plus")
+                    Label("あたらしい日記帳をつくる ♡", systemImage: "plus")
                         .font(.headline).frame(maxWidth: .infinity).padding(14)
                 }.buttonStyle(.borderedProminent).tint(DiaryStyle.ink)
                 Text("このタブは端末内デモです。別のiPhoneと交換するには「共有」タブを利用してください。")
@@ -433,24 +432,12 @@ struct DiaryEditorScreen: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(Date.now, format: .dateTime.year().month().day().weekday(.wide))
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    TextField("今日のタイトル", text: $title)
-                        .font(.system(.title2, design: .serif, weight: .bold))
+                    MawaruSectionLabel(step: "01", title: "ノートに書こう", symbol: "pencil.and.scribble")
+                    NostalgicNotebookEditor(title: $title, text: $text, decoration: $decoration)
                         .onChange(of: title) { _, _ in saveDraft() }
-                    Divider()
-                    TextEditor(text: $text)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 280)
                         .onChange(of: text) { _, _ in saveDraft() }
                         .onChange(of: decoration) { _, _ in saveDraft() }
-                        .overlay(alignment: .topLeading) {
-                            if text.isEmpty {
-                                Text("今日はどんな一日だった？")
-                                    .foregroundStyle(.tertiary).padding(.top, 9)
-                                    .allowsHitTesting(false)
-                            }
-                        }
+                    MawaruSectionLabel(step: "02", title: "写真とシールでデコろう", symbol: "sparkles")
                     if let photo, let image = UIImage(data: photo) {
                         Image(uiImage: image).resizable().scaledToFit()
                             .frame(maxHeight: 240)
@@ -459,14 +446,13 @@ struct DiaryEditorScreen: View {
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         Label("写真を1枚添える", systemImage: "photo.badge.plus")
                     }
-                    DiaryDecorationEditor(decoration: $decoration)
-                    Text("次の人へ渡すと、このページは編集できません。")
+                    DiaryDecorationEditor(decoration: $decoration, showsPreview: false)
+                    Text("シールは文字の上にも貼れるよ。完成したらバトンを渡そう ♡")
                         .font(.footnote).foregroundStyle(.secondary)
-                }.padding(20).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-                    .padding(16)
+                }.padding(18)
             }
             .background(DiaryStyle.background.opacity(0.55))
-            .navigationTitle("新しいページ")
+            .navigationTitle("きょうの交換日記")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("閉じる") { saveDraft(); dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -515,20 +501,11 @@ struct DiaryPageScreen: View {
         ScrollView {
             if let page {
                 VStack(alignment: .leading, spacing: 19) {
-                    Text(page.date, format: .dateTime.year().month().day())
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    DiaryStickerBoard(decoration: .constant(page.decoration ?? DiaryDecoration()))
-                    Text(page.title.isEmpty ? "無題のページ" : page.title)
-                        .font(.system(.largeTitle, design: .serif, weight: .bold))
-                    Text("written by \(page.author)")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Divider()
-                    Text(page.text).font(.system(.body, design: .serif))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if let image = store.image(for: page) {
-                        Image(uiImage: image).resizable().scaledToFit()
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
+                    NostalgicNotebookReadPage(
+                        title: page.title, text: page.text, author: page.author,
+                        date: page.date, decoration: page.decoration ?? DiaryDecoration(),
+                        attachedPhoto: store.image(for: page)
+                    )
                     Divider()
                     HStack {
                         Button { store.heart(entryID) } label: {
@@ -541,9 +518,7 @@ struct DiaryPageScreen: View {
                         }
                     }.buttonStyle(.bordered).tint(DiaryStyle.ink)
                 }
-                .padding(24).frame(maxWidth: .infinity, alignment: .leading)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-                .padding(18)
+                .padding(18).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .background(DiaryStyle.background.opacity(0.55))
@@ -593,7 +568,7 @@ struct SettingsScreen: View {
         Form {
             Section("アプリについて") {
                 LabeledContent("アプリ名", value: "まわる")
-                LabeledContent("バージョン", value: "0.4.0")
+                LabeledContent("バージョン", value: "0.5.0")
                 LabeledContent("データ保存", value: "このiPhone内")
             }
             Section("データ管理") {

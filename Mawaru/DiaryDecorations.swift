@@ -206,7 +206,7 @@ private struct DiaryStickerShape: View {
 }
 
 // Each sticker supports drag, pinch, and rotate; values are written back to the model.
-private struct DiaryMovableSticker: View {
+struct DiaryMovableSticker: View {
     @Binding var sticker: DiarySticker
     let canvasSize: CGSize
     let editing: Bool
@@ -324,6 +324,7 @@ struct DiaryStickerBoard: View {
 
 struct DiaryDecorationEditor: View {
     @Binding var decoration: DiaryDecoration
+    var showsPreview = true
 
     private let paperNames = ["クリーム", "さくら", "ミント", "ラベンダー"]
     private let paperColors: [Color] = [
@@ -336,7 +337,7 @@ struct DiaryDecorationEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Label("シールでデコろう", systemImage: "sparkles").font(.headline)
+                Label("あつめたシールを貼ろう", systemImage: "sparkles").font(.system(.headline, design: .rounded, weight: .bold))
                 Spacer()
                 if !decoration.stickers.isEmpty || !decoration.photos.isEmpty {
                     Menu {
@@ -347,9 +348,11 @@ struct DiaryDecorationEditor: View {
                     } label: { Image(systemName: "ellipsis.circle") }
                 }
             }
-            DiaryStickerBoard(decoration: $decoration, editing: true)
+            if showsPreview {
+                DiaryStickerBoard(decoration: $decoration, editing: true)
+            }
             DiaryPhotoInsertionControls(decoration: $decoration)
-            Text("シールや写真をタップして追加。ドラッグで移動、2本指で拡大・回転。長押しで剥がせるよ。")
+            Text("上のノートに、文字を隠すようにペタッ。写真もシールもドラッグ・拡大・回転できるよ ♡")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -398,6 +401,6 @@ struct DiaryDecorationEditor: View {
             }
         }
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .background(MawaruPastel.lemon.opacity(0.30), in: RoundedRectangle(cornerRadius: 22))
     }
 }
