@@ -146,7 +146,17 @@ enum DiaryCloudPhotos {
                          location: DiaryCloudPhotoLocation) async throws -> UIImage {
         if let image = DiaryPhotoVault.image(for: photo) { return image }
         let ref = Storage.storage().reference(withPath: location.path(for: photo))
-        let bytes = try await ref.getData(maxSize: 2_000_000)
+        let bytes: Data = try await withCheckedThrowingContinuation { continuation in
+            _ = ref.getData(maxSize: 2_000_000) { data, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let data {
+                    continuation.resume(returning: data)
+                } else {
+                    continuation.resume(throwing: DiaryPhotoError.unsupported)
+                }
+            }
+        }
         try DiaryPhotoVault.cache(bytes, for: photo)
         guard let image = UIImage(data: bytes) else { throw DiaryPhotoError.unsupported }
         return image
