@@ -500,7 +500,7 @@ final class NearbyDiaryStore: ObservableObject {
             try save()
             if waiting.kind == "page" {
                 UserDefaults.standard.removeObject(
-                    forKey: "mawaru.nearby.draft.(ack.book.id.uuidString)"
+                    forKey: "mawaru.nearby.draft.\(ack.book.id.uuidString)"
                 )
             }
             lastCompletedTransfer = ack.transactionID
