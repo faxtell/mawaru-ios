@@ -502,9 +502,9 @@ struct DiaryEditorScreen: View {
                     }
                     DiaryDecorationEditor(decoration: $decoration, showsPreview: false)
                     HStack {
-                        Text("本文 (text.count)/5000文字")
+                        Text("本文 \(text.count)/5000文字")
                         Spacer()
-                        Text("タイトル (title.count)/80文字")
+                        Text("タイトル \(title.count)/80文字")
                     }
                     .font(.caption)
                     .foregroundStyle(text.count > 5000 || title.count > 80 ? Color.red : Color.secondary)
