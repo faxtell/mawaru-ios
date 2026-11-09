@@ -1,0 +1,14 @@
+.DS_Store
+DerivedData/
+build/
+dist/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+Mawaru.xcodeproj/
+Mawaru/GoogleService-Info.plist
+.firebaserc
+backend/functions/node_modules/
+backend/functions/.env*
+*.p8
+*.p12
+*.mobileprovision

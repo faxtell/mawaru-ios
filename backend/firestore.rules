@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isBookMember(bookId) {
+      return signedIn() &&
+        request.auth.uid in get(/databases/$(database)/documents/notebooks/$(bookId)).data.memberIds;
+    }
+    match /notebooks/{bookId} {
+      // A query must constrain memberIds using arrayContains with the signed-in UID.
+      allow get, list: if signedIn() && request.auth.uid in resource.data.memberIds;
+      // All state mutations use authenticated Cloud Functions with Firestore transactions.
+      allow create, update, delete: if false;
+      match /entries/{entryId} {
+        allow get, list: if isBookMember(bookId);
+        allow create, update, delete: if false;
+      }
+    }
+    match /invites/{inviteHash} {
+      // Codes are secret bearer tokens, held hashed and never client-readable.
+      allow read, write: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

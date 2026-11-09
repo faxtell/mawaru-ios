@@ -129,11 +129,14 @@ enum DiaryStyle {
 
 @main struct MawaruApp: App {
     @StateObject private var store = DiaryStore()
+    @StateObject private var shared = SharedDiaryStore()
     var body: some Scene {
         WindowGroup {
             TabView {
                 NavigationStack { HomeScreen() }
                     .tabItem { Label("日記帳", systemImage: "books.vertical.fill") }
+                NavigationStack { SharedHomeScreen() }
+                    .tabItem { Label("共有", systemImage: "person.2.fill") }
                 NavigationStack { MemoriesScreen() }
                     .tabItem { Label("思い出", systemImage: "heart.text.square") }
                 NavigationStack { SettingsScreen() }
@@ -141,6 +144,7 @@ enum DiaryStyle {
             }
             .tint(DiaryStyle.ink)
             .environmentObject(store)
+            .environmentObject(shared)
         }
     }
 }
