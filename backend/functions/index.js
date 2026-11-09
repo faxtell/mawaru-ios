@@ -3,7 +3,7 @@ const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue, Timestamp} = require("firebase-admin/firestore");
 const {randomBytes, createHash} = require("node:crypto");
-const {shortText, nextTurn, isValidRequestId, normalizedInvite} = require("./lib/logic");
+const {shortText, nextTurn, isValidRequestId, normalizedInvite, checkedDecoration} = require("./lib/logic");
 
 initializeApp();
 const db = getFirestore();
@@ -107,6 +107,9 @@ exports.submitEntry = onCall(callableOptions, async (request) => {
   if (!isValidRequestId(requestId)) fail("invalid-argument", "投稿IDが無効です。");
   const title = checked(request.data?.title ?? "", 80, "タイトル", true);
   const body = checked(request.data?.body, 5000, "本文");
+  let decoration;
+  try { decoration = checkedDecoration(request.data?.decoration); }
+  catch { fail("invalid-argument", "シールやノートのデザインが無効です。"); }
   const entryRef = ref.collection("entries").doc(requestId);
   return db.runTransaction(async (tx) => {
     const bookSnap = await tx.get(ref);
@@ -125,7 +128,8 @@ exports.submitEntry = onCall(callableOptions, async (request) => {
     const sequence = (book.lastSequence || 0) + 1;
     tx.create(entryRef, {
       authorId: uid, authorName: book.memberNames[index],
-      title, body, sequence, createdAt: FieldValue.serverTimestamp(),
+      title, body, sequence, decoration,
+      createdAt: FieldValue.serverTimestamp(),
     });
     tx.update(ref, {
       currentTurn: nextTurn(book.currentTurn, book.memberIds.length),

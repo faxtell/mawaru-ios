@@ -80,7 +80,7 @@ struct SharedHomeScreen: View {
                             Label("招待コードから参加", systemImage: "person.badge.plus")
                                 .frame(maxWidth: .infinity).padding(11)
                         }.buttonStyle(.bordered)
-                        Text("共有日記は参加者だけが閲覧できます。現在は文字の日記に対応し、写真・通知は次の開発段階で対応します。")
+                        Text("共有日記は参加者だけが閲覧できます。文章とシール・紙のデザインを同期。写真・通知は次の段階で対応します。")
                             .font(.footnote).foregroundStyle(.secondary)
                     }.padding(20)
                 }
@@ -304,6 +304,7 @@ struct SharedBookScreen: View {
                                 }.font(.caption).foregroundStyle(.secondary)
                                 Text(page.title.isEmpty ? "無題のページ" : page.title)
                                     .font(.system(.title3, design: .serif, weight: .bold))
+                                DiaryStickerBoard(decoration: .constant(page.decoration))
                                 Text(page.body).font(.body)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
@@ -384,6 +385,7 @@ struct SharedEditorScreen: View {
     @State private var title = ""
     @State private var bodyText = ""
     @State private var requestID = UUID().uuidString
+    @State private var decoration = DiaryDecoration()
     @State private var ready = false
     @State private var busy = false
     @State private var error: String?
@@ -393,7 +395,9 @@ struct SharedEditorScreen: View {
     }
     private func saveDraft() {
         guard ready else { return }
-        UserDefaults.standard.set(["title": title, "body": bodyText, "id": requestID], forKey: key)
+        let decorationData = (try? JSONEncoder().encode(decoration)) ?? Data()
+        UserDefaults.standard.set(["title": title, "body": bodyText, "id": requestID,
+                                   "decoration": decorationData] as [String: Any], forKey: key)
     }
     var body: some View {
         NavigationStack {
@@ -409,6 +413,8 @@ struct SharedEditorScreen: View {
                         .scrollContentBackground(.hidden)
                         .frame(minHeight: 270)
                         .onChange(of: bodyText) { _, _ in saveDraft() }
+                    DiaryDecorationEditor(decoration: $decoration)
+                        .onChange(of: decoration) { _, _ in saveDraft() }
                     Text("送信するとページは参加メンバー全員に公開され、順番が次の人に移ります。")
                         .font(.footnote).foregroundStyle(.secondary)
                     Text("写真のクラウド同期はまだ未対応です。")
@@ -431,7 +437,8 @@ struct SharedEditorScreen: View {
                         Task {
                             do {
                                 try await shared.submit(bookID: bookID,
-                                    requestID: requestID, title: title, body: bodyText)
+                                    requestID: requestID, title: title, body: bodyText,
+                                    decoration: decoration)
                                 UserDefaults.standard.removeObject(forKey: key)
                                 dismiss()
                             } catch { self.error = error.localizedDescription }
@@ -447,6 +454,10 @@ struct SharedEditorScreen: View {
                     title = draft["title"] as? String ?? ""
                     bodyText = draft["body"] as? String ?? ""
                     requestID = draft["id"] as? String ?? UUID().uuidString
+                    if let data = draft["decoration"] as? Data,
+                       let saved = try? JSONDecoder().decode(DiaryDecoration.self, from: data) {
+                        decoration = saved
+                    }
                 }
                 ready = true
             }

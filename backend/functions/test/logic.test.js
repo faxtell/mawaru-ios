@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {shortText, nextTurn, isValidRequestId, normalizedInvite} = require("../lib/logic");
+const {shortText, nextTurn, isValidRequestId, normalizedInvite, checkedDecoration} = require("../lib/logic");
 
 test("baton moves through two-to-five members and wraps", () => {
   for (let count = 2; count <= 5; count++) {
@@ -26,4 +26,28 @@ test("idempotency IDs and invitation codes require exact formats", () => {
   assert.ok(!isValidRequestId("../malicious"));
   assert.equal(normalizedInvite("abc123abc123abc123abc123"), "ABC123ABC123ABC123ABC123");
   assert.equal(normalizedInvite("guess"), null);
+});
+
+test("a valid sticker sheet is retained and normalized", () => {
+  const input = {paper: 2, stickers: [{
+    id: "a04092ff-a08b-48e0-a67c-4f9c604270a0", kind: "tapePink",
+    x: 0.5, y: 0.4, scale: 1.4, rotation: -12
+  }]};
+  const result = checkedDecoration(input);
+  assert.equal(result.paper, 2);
+  assert.equal(result.stickers[0].kind, "tapePink");
+  assert.equal(result.stickers[0].id, input.stickers[0].id.toUpperCase());
+  assert.deepEqual(checkedDecoration(), {paper: 0, stickers: []});
+});
+test("invalid decoration, sticker sizes and duplicate IDs are rejected", () => {
+  const s = {
+    id: "a04092ff-a08b-48e0-a67c-4f9c604270a0",
+    kind: "heart", x: 0.5, y: 0.5, scale: 1, rotation: 0
+  };
+  assert.throws(() => checkedDecoration({paper: 4, stickers: []}));
+  assert.throws(() => checkedDecoration({paper: 0, stickers: [s, s]}));
+  assert.throws(() => checkedDecoration({paper: 0, stickers: [{...s, x: -1}]}));
+  assert.throws(() => checkedDecoration({paper: 0, stickers: [{...s, scale: 40}]}));
+  assert.throws(() => checkedDecoration({paper: 0, stickers: [{...s, kind: "not-a-sticker"}]}));
+  assert.throws(() => checkedDecoration({paper: 0, stickers: Array(25).fill(s)}));
 });

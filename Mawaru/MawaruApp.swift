@@ -25,6 +25,7 @@ struct DiaryEntry: Codable, Identifiable {
     var text: String
     var date = Date()
     var photoFilename: String?
+    var decoration: DiaryDecoration?
     var hearted = false
     var favorite = false
 }
@@ -32,6 +33,7 @@ struct DiaryEntry: Codable, Identifiable {
 struct DiaryDraft: Codable {
     var title: String
     var text: String
+    var decoration: DiaryDecoration?
 }
 
 final class DiaryStore: ObservableObject {
@@ -73,11 +75,12 @@ final class DiaryStore: ObservableObject {
         guard let i = books.firstIndex(where: { $0.id == id }) else { return }
         books[i].paused.toggle()
     }
-    @discardableResult func submit(bookID: UUID, title: String, text: String, photo: Data?) -> Bool {
+    @discardableResult func submit(bookID: UUID, title: String, text: String, photo: Data?, decoration: DiaryDecoration = DiaryDecoration()) -> Bool {
         guard let i = books.firstIndex(where: { $0.id == bookID }), books[i].isMyTurn,
               (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false || photo != nil) else { return false }
         let author = books[i].currentWriter
         var item = DiaryEntry(bookID: bookID, author: author, title: title, text: text)
+        item.decoration = decoration
         if let photo {
             let filename = item.id.uuidString + ".jpg"
             do {
@@ -212,7 +215,7 @@ struct HomeScreen: View {
                     Label("新しい日記帳を作る", systemImage: "plus")
                         .font(.headline).frame(maxWidth: .infinity).padding(14)
                 }.buttonStyle(.borderedProminent).tint(DiaryStyle.ink)
-                Text("このバージョンは端末内デモです。他のiPhoneとの同期・招待は未対応です。")
+                Text("このタブは端末内デモです。別のiPhoneと交換するには「共有」タブを利用してください。")
                     .font(.footnote).foregroundStyle(.secondary)
             }.padding(20)
         }
@@ -260,7 +263,7 @@ struct CreateBookScreen: View {
                     }
                 }
                 Section {
-                    Text("最初のメンバーから順番に日記を回します。招待は今後のバージョンで対応予定です。")
+                    Text("この日記帳は端末内で交換を試すモードです。実際の招待は「共有」タブから行えます。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -358,6 +361,9 @@ struct BookScreen: View {
                                         .font(.system(.title3, design: .serif, weight: .semibold))
                                     Text(page.text).font(.body).lineLimit(3)
                                     if page.photoFilename != nil { Label("写真付き", systemImage: "photo").font(.caption) }
+                                    if let decor = page.decoration, !decor.stickers.isEmpty {
+                                        Label("シール \(decor.stickers.count)枚", systemImage: "sparkles").font(.caption)
+                                    }
                                     HStack {
                                         if page.hearted { Image(systemName: "heart.fill") }
                                         if page.favorite { Image(systemName: "bookmark.fill") }
@@ -410,10 +416,11 @@ struct DiaryEditorScreen: View {
     @State private var photo: Data?
     @State private var ready = false
     @State private var failed = false
+    @State private var decoration = DiaryDecoration()
     private var draftKey: String { "mawaru.draft.\(bookID.uuidString)" }
     private func saveDraft() {
         guard ready else { return }
-        if let data = try? JSONEncoder().encode(DiaryDraft(title: title, text: text)) {
+        if let data = try? JSONEncoder().encode(DiaryDraft(title: title, text: text, decoration: decoration)) {
             UserDefaults.standard.set(data, forKey: draftKey)
         }
     }
@@ -431,6 +438,7 @@ struct DiaryEditorScreen: View {
                         .scrollContentBackground(.hidden)
                         .frame(minHeight: 280)
                         .onChange(of: text) { _, _ in saveDraft() }
+                        .onChange(of: decoration) { _, _ in saveDraft() }
                         .overlay(alignment: .topLeading) {
                             if text.isEmpty {
                                 Text("今日はどんな一日だった？")
@@ -446,6 +454,7 @@ struct DiaryEditorScreen: View {
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         Label("写真を1枚添える", systemImage: "photo.badge.plus")
                     }
+                    DiaryDecorationEditor(decoration: $decoration)
                     Text("次の人へ渡すと、このページは編集できません。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }.padding(20).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
@@ -457,7 +466,7 @@ struct DiaryEditorScreen: View {
                 ToolbarItem(placement: .cancellationAction) { Button("閉じる") { saveDraft(); dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("次へ渡す") {
-                        if store.submit(bookID: bookID, title: title, text: text, photo: photo) {
+                        if store.submit(bookID: bookID, title: title, text: text, photo: photo, decoration: decoration) {
                             UserDefaults.standard.removeObject(forKey: draftKey)
                             dismiss()
                         } else { failed = true }
@@ -470,6 +479,7 @@ struct DiaryEditorScreen: View {
                 if let data = UserDefaults.standard.data(forKey: draftKey),
                    let draft = try? JSONDecoder().decode(DiaryDraft.self, from: data) {
                     title = draft.title; text = draft.text
+                    decoration = draft.decoration ?? DiaryDecoration()
                 }
                 ready = true
             }
@@ -501,6 +511,7 @@ struct DiaryPageScreen: View {
                 VStack(alignment: .leading, spacing: 19) {
                     Text(page.date, format: .dateTime.year().month().day())
                         .font(.subheadline).foregroundStyle(.secondary)
+                    DiaryStickerBoard(decoration: .constant(page.decoration ?? DiaryDecoration()))
                     Text(page.title.isEmpty ? "無題のページ" : page.title)
                         .font(.system(.largeTitle, design: .serif, weight: .bold))
                     Text("written by \(page.author)")
@@ -576,7 +587,7 @@ struct SettingsScreen: View {
         Form {
             Section("アプリについて") {
                 LabeledContent("アプリ名", value: "まわる")
-                LabeledContent("バージョン", value: "0.1.0")
+                LabeledContent("バージョン", value: "0.3.0")
                 LabeledContent("データ保存", value: "このiPhone内")
             }
             Section("データ管理") {
@@ -586,7 +597,7 @@ struct SettingsScreen: View {
                 Button("この端末の日記データを削除", role: .destructive) { confirmErase = true }
             }
             Section {
-                Text("現在はローカルデモ版です。写真を含む完全なデータ出力、アカウント管理、Firebase同期、通知、課金は今後実装予定です。")
+                Text("ローカル日記はこのiPhone内に保存されます。シールや紙のデコレーションに対応。共有機能はFirebase接続後に使えます。通知、課金、写真を含む完全なデータ出力は未対応です。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }

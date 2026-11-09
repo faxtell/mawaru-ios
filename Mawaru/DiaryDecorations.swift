@@ -1,0 +1,364 @@
+import SwiftUI
+
+// A sticker is data, not a flattened screenshot: each member sees the same layout.
+// Positions are normalized to a 0–1 canvas so they survive different iPhone sizes.
+struct DiarySticker: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var kind: String
+    var x: Double
+    var y: Double
+    var scale: Double = 1
+    var rotation: Double = 0
+}
+
+struct DiaryDecoration: Codable, Equatable {
+    var paper: Int = 0
+    var stickers: [DiarySticker] = []
+
+    mutating func addSticker(_ kind: String) {
+        guard stickers.count < 24, DiaryStickerCatalog.items.contains(where: { $0.id == kind }) else { return }
+        let offset = Double(stickers.count % 6) * 0.065
+        stickers.append(DiarySticker(kind: kind, x: 0.42 + offset, y: 0.38 + offset))
+    }
+
+    var cloudValue: [String: Any] {
+        [
+            "paper": paper,
+            "stickers": stickers.map {
+                [
+                    "id": $0.id.uuidString,
+                    "kind": $0.kind,
+                    "x": $0.x,
+                    "y": $0.y,
+                    "scale": $0.scale,
+                    "rotation": $0.rotation
+                ] as [String: Any]
+            }
+        ]
+    }
+
+    static func fromCloud(_ raw: Any?) -> DiaryDecoration {
+        guard let map = raw as? [String: Any] else { return DiaryDecoration() }
+        let p = (map["paper"] as? Int) ?? 0
+        let validPaper = (0...3).contains(p) ? p : 0
+        let elements = (map["stickers"] as? [[String: Any]] ?? []).prefix(24).compactMap { item -> DiarySticker? in
+            guard let idString = item["id"] as? String,
+                  let id = UUID(uuidString: idString),
+                  let kind = item["kind"] as? String,
+                  DiaryStickerCatalog.items.contains(where: { $0.id == kind }),
+                  let x = item["x"] as? Double,
+                  let y = item["y"] as? Double,
+                  let scale = item["scale"] as? Double,
+                  let rotation = item["rotation"] as? Double,
+                  x.isFinite, y.isFinite, scale.isFinite, rotation.isFinite else { return nil }
+            return DiarySticker(id: id, kind: kind,
+                x: min(0.93, max(0.07, x)),
+                y: min(0.90, max(0.10, y)),
+                scale: min(2.5, max(0.5, scale)),
+                rotation: min(180, max(-180, rotation)))
+        }
+        return DiaryDecoration(paper: validPaper, stickers: Array(elements))
+    }
+}
+
+struct DiaryStickerKind: Identifiable {
+    let id: String
+    let visual: String
+    let name: String
+    let tint: Color
+}
+
+enum DiaryStickerCatalog {
+    static let items: [DiaryStickerKind] = [
+        .init(id: "heart", visual: "💗", name: "ハート", tint: .pink),
+        .init(id: "ribbon", visual: "🎀", name: "リボン", tint: .pink),
+        .init(id: "bear", visual: "🧸", name: "くま", tint: .brown),
+        .init(id: "strawberry", visual: "🍓", name: "いちご", tint: .pink),
+        .init(id: "flower", visual: "🌷", name: "お花", tint: .pink),
+        .init(id: "sparkles", visual: "✨", name: "きらきら", tint: .yellow),
+        .init(id: "cloud", visual: "☁️", name: "雲", tint: .blue),
+        .init(id: "star", visual: "⭐️", name: "星", tint: .yellow),
+        .init(id: "paw", visual: "🐾", name: "肉球", tint: .brown),
+        .init(id: "letter", visual: "💌", name: "お手紙", tint: .pink),
+        .init(id: "cake", visual: "🍰", name: "ケーキ", tint: .orange),
+        .init(id: "rainbow", visual: "🌈", name: "虹", tint: .blue),
+        .init(id: "cat", visual: "🐱", name: "ねこ", tint: .orange),
+        .init(id: "coffee", visual: "☕️", name: "コーヒー", tint: .brown),
+        .init(id: "tapePink", visual: "PINK", name: "ピンクのテープ", tint: Color(red: 0.97, green: 0.67, blue: 0.73)),
+        .init(id: "tapeMint", visual: "MINT", name: "ミントのテープ", tint: Color(red: 0.65, green: 0.82, blue: 0.73)),
+        .init(id: "tapeLavender", visual: "LOVE", name: "紫のテープ", tint: Color(red: 0.77, green: 0.71, blue: 0.89))
+    ]
+    static func item(_ kind: String) -> DiaryStickerKind? {
+        items.first { $0.id == kind }
+    }
+}
+
+private struct DiaryPaperBackground: View {
+    let style: Int
+
+    private var paperColor: Color {
+        switch style {
+        case 1: Color(red: 1.0, green: 0.94, blue: 0.95)
+        case 2: Color(red: 0.93, green: 0.97, blue: 0.94)
+        case 3: Color(red: 0.96, green: 0.94, blue: 1.0)
+        default: Color(red: 1.0, green: 0.985, blue: 0.94)
+        }
+    }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 18)
+            .fill(paperColor)
+            .overlay {
+                Canvas { context, size in
+                    let ink = Color(red: 0.64, green: 0.57, blue: 0.58).opacity(0.23)
+                    if style == 2 {
+                        for x in stride(from: CGFloat(0), through: size.width, by: CGFloat(24)) {
+                            var line = Path()
+                            line.move(to: CGPoint(x: x, y: 0))
+                            line.addLine(to: CGPoint(x: x, y: size.height))
+                            context.stroke(line, with: .color(ink), lineWidth: 0.7)
+                        }
+                    }
+                    for y in stride(from: CGFloat(28), through: size.height, by: CGFloat(24)) {
+                        if style == 3 {
+                            for x in stride(from: CGFloat(15), through: size.width, by: CGFloat(24)) {
+                                context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 2, height: 2)),
+                                    with: .color(ink))
+                            }
+                        } else {
+                            var line = Path()
+                            line.move(to: CGPoint(x: 16, y: y))
+                            line.addLine(to: CGPoint(x: size.width - 16, y: y))
+                            context.stroke(line, with: .color(ink), lineWidth: 0.7)
+                        }
+                    }
+                    var margin = Path()
+                    margin.move(to: CGPoint(x: 34, y: 0))
+                    margin.addLine(to: CGPoint(x: 34, y: size.height))
+                    context.stroke(margin,
+                        with: .color(Color(red: 0.9, green: 0.55, blue: 0.57).opacity(0.23)),
+                        lineWidth: 1.2)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 18).strokeBorder(.brown.opacity(0.08), lineWidth: 1)
+            }
+    }
+}
+
+private struct DiaryStickerShape: View {
+    let item: DiaryStickerKind
+    var body: some View {
+        Group {
+            if item.id.hasPrefix("tape") {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(item.tint.opacity(0.76))
+                    .frame(width: 94, height: 28)
+                    .overlay {
+                        HStack(spacing: 7) {
+                            Image(systemName: "heart.fill").font(.system(size: 9))
+                            Text(item.visual).font(.system(size: 10, weight: .black, design: .rounded))
+                            Image(systemName: "heart.fill").font(.system(size: 9))
+                        }
+                        .foregroundStyle(.white.opacity(0.94))
+                    }
+            } else {
+                Text(item.visual)
+                    .font(.system(size: 40))
+                    .frame(width: 63, height: 63)
+                    .background(.white.opacity(0.78), in: Circle())
+                    .overlay { Circle().strokeBorder(.white.opacity(0.8), lineWidth: 2) }
+            }
+        }
+        .shadow(color: .brown.opacity(0.16), radius: 2, y: 2)
+    }
+}
+
+// Each sticker supports drag, pinch, and rotate; values are written back to the model.
+private struct DiaryMovableSticker: View {
+    @Binding var sticker: DiarySticker
+    let canvasSize: CGSize
+    let editing: Bool
+    let onRemove: () -> Void
+
+    @State private var dragged = CGSize.zero
+    @State private var pinched: CGFloat = 1
+    @State private var spun = Angle.zero
+
+    private var drag: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { dragged = $0.translation }
+            .onEnded { value in
+                let w = max(canvasSize.width, 1)
+                let h = max(canvasSize.height, 1)
+                sticker.x = min(0.93, max(0.07, sticker.x + value.translation.width / w))
+                sticker.y = min(0.90, max(0.10, sticker.y + value.translation.height / h))
+                dragged = .zero
+            }
+    }
+    private var pinch: some Gesture {
+        MagnificationGesture()
+            .onChanged { pinched = $0 }
+            .onEnded { value in
+                sticker.scale = min(2.5, max(0.5, sticker.scale * Double(value)))
+                pinched = 1
+            }
+    }
+    private var rotate: some Gesture {
+        RotationGesture()
+            .onChanged { spun = $0 }
+            .onEnded { value in
+                let angle = sticker.rotation + value.degrees
+                sticker.rotation = min(180, max(-180, angle))
+                spun = .zero
+            }
+    }
+
+    private var shape: some View {
+        Group {
+            if let item = DiaryStickerCatalog.item(sticker.kind) {
+                DiaryStickerShape(item: item)
+            }
+        }
+        .scaleEffect(sticker.scale * Double(pinched))
+        .rotationEffect(.degrees(sticker.rotation + spun.degrees))
+        .offset(dragged)
+        .position(x: canvasSize.width * sticker.x, y: canvasSize.height * sticker.y)
+        .accessibilityLabel(DiaryStickerCatalog.item(sticker.kind)?.name ?? "シール")
+    }
+
+    var body: some View {
+        if editing {
+            shape
+                .gesture(drag)
+                .simultaneousGesture(pinch)
+                .simultaneousGesture(rotate)
+                .contextMenu {
+                    Button(role: .destructive) {
+                        onRemove()
+                    } label: {
+                        Label("シールを剥がす", systemImage: "trash")
+                    }
+                }
+        } else {
+            shape.allowsHitTesting(false)
+        }
+    }
+}
+
+struct DiaryStickerBoard: View {
+    @Binding var decoration: DiaryDecoration
+    var editing = false
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                DiaryPaperBackground(style: decoration.paper)
+                VStack {
+                    HStack {
+                        Image(systemName: "heart.text.square")
+                        Text("little memories")
+                            .font(.system(.caption, design: .serif, weight: .semibold))
+                        Spacer()
+                        Image(systemName: "sparkles")
+                    }
+                    .foregroundStyle(.brown.opacity(0.47))
+                    .padding(.horizontal, 48)
+                    .padding(.top, 13)
+                    Spacer()
+                    Text("a page just for us ♡")
+                        .font(.system(.caption2, design: .serif))
+                        .foregroundStyle(.brown.opacity(0.38))
+                        .padding(.bottom, 14)
+                }
+                ForEach($decoration.stickers) { $sticker in
+                    DiaryMovableSticker(sticker: $sticker, canvasSize: geometry.size,
+                                        editing: editing) {
+                        decoration.stickers.removeAll { $0.id == sticker.id }
+                    }
+                }
+            }
+        }
+        .frame(height: 254)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(editing ? "シールを貼るキャンバス" : "日記のデコレーション")
+    }
+}
+
+struct DiaryDecorationEditor: View {
+    @Binding var decoration: DiaryDecoration
+
+    private let paperNames = ["クリーム", "さくら", "ミント", "ラベンダー"]
+    private let paperColors: [Color] = [
+        Color(red: 1, green: 0.98, blue: 0.92),
+        Color(red: 1, green: 0.92, blue: 0.94),
+        Color(red: 0.90, green: 0.97, blue: 0.92),
+        Color(red: 0.94, green: 0.92, blue: 0.99)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("シールでデコろう", systemImage: "sparkles").font(.headline)
+                Spacer()
+                if !decoration.stickers.isEmpty {
+                    Menu {
+                        Button("シールを全部剥がす", systemImage: "trash", role: .destructive) {
+                            decoration.stickers.removeAll()
+                        }
+                    } label: { Image(systemName: "ellipsis.circle") }
+                }
+            }
+            DiaryStickerBoard(decoration: $decoration, editing: true)
+            Text("シールをタップして追加。ドラッグで移動、2本指で拡大・回転。長押しで剥がせるよ。")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 9) {
+                    ForEach(DiaryStickerCatalog.items) { sticker in
+                        Button {
+                            decoration.addSticker(sticker.id)
+                        } label: {
+                            VStack(spacing: 5) {
+                                DiaryStickerShape(item: sticker)
+                                    .scaleEffect(0.74)
+                                    .frame(width: 67, height: 52)
+                                Text(sticker.name).font(.system(size: 10)).lineLimit(1)
+                            }
+                            .frame(width: 76, height: 76)
+                            .background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(decoration.stickers.count >= 24)
+                        .accessibilityLabel("\(sticker.name)を貼る")
+                    }
+                }
+            }
+            Text("\(decoration.stickers.count)/24枚").font(.caption).foregroundStyle(.secondary)
+            Text("ノートの紙").font(.subheadline.bold())
+            HStack(spacing: 8) {
+                ForEach(0..<4, id: \.self) { index in
+                    Button {
+                        decoration.paper = index
+                    } label: {
+                        VStack(spacing: 6) {
+                            RoundedRectangle(cornerRadius: 9)
+                                .fill(paperColors[index])
+                                .frame(height: 38)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 9)
+                                        .strokeBorder(decoration.paper == index ? DiaryStyle.ink : Color.gray.opacity(0.14),
+                                                      lineWidth: decoration.paper == index ? 2 : 1)
+                                }
+                            Text(paperNames[index])
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                    }.buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+    }
+}

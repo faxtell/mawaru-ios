@@ -27,4 +27,39 @@ function normalizedInvite(value) {
     ? value.trim().toUpperCase() : null;
 }
 
-module.exports = {shortText, nextTurn, isValidRequestId, normalizedInvite};
+const stickerKinds = new Set([
+  "heart", "ribbon", "bear", "strawberry", "flower", "sparkles", "cloud",
+  "star", "paw", "letter", "cake", "rainbow", "cat", "coffee",
+  "tapePink", "tapeMint", "tapeLavender"
+]);
+
+function checkedDecoration(raw) {
+  if (raw == null) return {paper: 0, stickers: []};
+  if (typeof raw !== "object" || Array.isArray(raw) ||
+      !Number.isInteger(raw.paper) || raw.paper < 0 || raw.paper > 3 ||
+      !Array.isArray(raw.stickers) || raw.stickers.length > 24) {
+    throw new Error("Invalid page decoration");
+  }
+  const seen = new Set();
+  const stickers = raw.stickers.map((s) => {
+    if (!s || typeof s !== "object" || Array.isArray(s) ||
+        typeof s.id !== "string" ||
+        !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(s.id) ||
+        seen.has(s.id.toUpperCase()) ||
+        !stickerKinds.has(s.kind) ||
+        !Number.isFinite(s.x) || s.x < 0.07 || s.x > 0.93 ||
+        !Number.isFinite(s.y) || s.y < 0.1 || s.y > 0.9 ||
+        !Number.isFinite(s.scale) || s.scale < 0.5 || s.scale > 2.5 ||
+        !Number.isFinite(s.rotation) || s.rotation < -180 || s.rotation > 180) {
+      throw new Error("Invalid page sticker");
+    }
+    seen.add(s.id.toUpperCase());
+    return {
+      id: s.id.toUpperCase(), kind: s.kind, x: s.x, y: s.y,
+      scale: s.scale, rotation: s.rotation
+    };
+  });
+  return {paper: raw.paper, stickers};
+}
+
+module.exports = {shortText, nextTurn, isValidRequestId, normalizedInvite, checkedDecoration};

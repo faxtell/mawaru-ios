@@ -56,6 +56,7 @@ struct SharedPage: Identifiable {
     let title: String
     let body: String
     let sequence: Int
+    let decoration: DiaryDecoration
     let createdAt: Date
 
     init?(document: QueryDocumentSnapshot) {
@@ -68,6 +69,7 @@ struct SharedPage: Identifiable {
         self.title = title
         self.body = body
         sequence = data["sequence"] as? Int ?? 0
+        decoration = DiaryDecoration.fromCloud(data["decoration"])
         createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? .distantPast
     }
 }
@@ -191,10 +193,10 @@ final class SharedDiaryStore: ObservableObject {
         guard let code = response["code"] as? String else { throw SharedDiaryError.invalidResponse }
         return code
     }
-    func submit(bookID: String, requestID: String, title: String, body: String) async throws {
+    func submit(bookID: String, requestID: String, title: String, body: String, decoration: DiaryDecoration) async throws {
         _ = try await call("submitEntry", data: [
             "bookId": bookID, "requestId": requestID,
-            "title": title, "body": body
+            "title": title, "body": body, "decoration": decoration.cloudValue
         ])
     }
     func setPaused(bookID: String, paused: Bool) async throws {
