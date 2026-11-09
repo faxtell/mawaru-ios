@@ -37,29 +37,45 @@ function checkedDecoration(raw) {
   if (raw == null) return {paper: 0, stickers: [], photos: []};
   if (typeof raw !== "object" || Array.isArray(raw) ||
       !Number.isInteger(raw.paper) || raw.paper < 0 || raw.paper > 3 ||
-      !Array.isArray(raw.stickers) || raw.stickers.length > 24) {
+      !Array.isArray(raw.stickers) || raw.stickers.length > 24 ||
+      (raw.photos !== undefined && (!Array.isArray(raw.photos) || raw.photos.length > 4))) {
     throw new Error("Invalid page decoration");
   }
-  const seen = new Set();
-  const stickers = raw.stickers.map((s) => {
-    if (!s || typeof s !== "object" || Array.isArray(s) ||
-        typeof s.id !== "string" ||
-        !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(s.id) ||
-        seen.has(s.id.toUpperCase()) ||
-        !stickerKinds.has(s.kind) ||
-        !Number.isFinite(s.x) || s.x < 0.07 || s.x > 0.93 ||
-        !Number.isFinite(s.y) || s.y < 0.1 || s.y > 0.9 ||
-        !Number.isFinite(s.scale) || s.scale < 0.5 || s.scale > 2.5 ||
-        !Number.isFinite(s.rotation) || s.rotation < -180 || s.rotation > 180) {
-      throw new Error("Invalid page sticker");
+
+  const ids = new Set();
+  function checkedPosition(p) {
+    return Number.isFinite(p.x) && p.x >= 0.07 && p.x <= 0.93 &&
+      Number.isFinite(p.y) && p.y >= 0.1 && p.y <= 0.9 &&
+      Number.isFinite(p.scale) && p.scale >= 0.5 && p.scale <= 2.5 &&
+      Number.isFinite(p.rotation) && p.rotation >= -180 && p.rotation <= 180;
+  }
+  function uniqueId(item) {
+    if (!item || typeof item !== "object" || Array.isArray(item) ||
+        typeof item.id !== "string" ||
+        !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(item.id) ||
+        ids.has(item.id.toUpperCase()) || !checkedPosition(item)) {
+      throw new Error("Invalid sticker placement");
     }
-    seen.add(s.id.toUpperCase());
-    return {
-      id: s.id.toUpperCase(), kind: s.kind, x: s.x, y: s.y,
-      scale: s.scale, rotation: s.rotation
-    };
+    const id = item.id.toUpperCase();
+    ids.add(id);
+    return id;
+  }
+
+  const stickers = raw.stickers.map((s) => {
+    const id = uniqueId(s);
+    if (!stickerKinds.has(s.kind)) throw new Error("Unknown sticker");
+    return {id, kind: s.kind, x: s.x, y: s.y,
+      scale: s.scale, rotation: s.rotation};
   });
-  return {paper: raw.paper, stickers};
+  const photos = (raw.photos || []).map((p) => {
+    const id = uniqueId(p);
+    if (p.format !== "jpg" && p.format !== "png") {
+      throw new Error("Unsupported image format");
+    }
+    return {id, format: p.format, x: p.x, y: p.y,
+      scale: p.scale, rotation: p.rotation};
+  });
+  return {paper: raw.paper, stickers, photos};
 }
 
 module.exports = {shortText, nextTurn, isValidRequestId, normalizedInvite, checkedDecoration};
