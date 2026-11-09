@@ -132,6 +132,9 @@ enum DiaryStyle {
 @main struct MawaruApp: App {
     @StateObject private var store = DiaryStore()
     @StateObject private var shared = SharedDiaryStore()
+    init() {
+        DiaryFonts.register()
+    }
     var body: some Scene {
         WindowGroup {
             TabView {
@@ -437,7 +440,9 @@ struct DiaryEditorScreen: View {
                         .onChange(of: title) { _, _ in saveDraft() }
                         .onChange(of: text) { _, _ in saveDraft() }
                         .onChange(of: decoration) { _, _ in saveDraft() }
-                    MawaruSectionLabel(step: "02", title: "写真とシールでデコろう", symbol: "sparkles")
+                    MawaruSectionLabel(step: "02", title: "文字をアレンジ", symbol: "textformat")
+                    DiaryTypographyControls(decoration: $decoration)
+                    MawaruSectionLabel(step: "03", title: "写真とシールでデコろう", symbol: "sparkles")
                     if let photo, let image = UIImage(data: photo) {
                         Image(uiImage: image).resizable().scaledToFit()
                             .frame(maxHeight: 240)
@@ -568,7 +573,7 @@ struct SettingsScreen: View {
         Form {
             Section("アプリについて") {
                 LabeledContent("アプリ名", value: "まわる")
-                LabeledContent("バージョン", value: "0.5.0")
+                LabeledContent("バージョン", value: "0.6.0")
                 LabeledContent("データ保存", value: "このiPhone内")
             }
             Section("データ管理") {

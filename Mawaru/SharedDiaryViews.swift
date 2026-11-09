@@ -404,7 +404,10 @@ struct SharedEditorScreen: View {
                         .onChange(of: title) { _, _ in saveDraft() }
                         .onChange(of: bodyText) { _, _ in saveDraft() }
                         .onChange(of: decoration) { _, _ in saveDraft() }
-                    MawaruSectionLabel(step: "02", title: "好きなシールを貼ろう", symbol: "sparkles")
+                    MawaruSectionLabel(step: "02", title: "文字をアレンジ", symbol: "textformat")
+                    DiaryTypographyControls(decoration: $decoration)
+                        .onChange(of: decoration) { _, _ in saveDraft() }
+                    MawaruSectionLabel(step: "03", title: "好きなシールを貼ろう", symbol: "sparkles")
                     DiaryDecorationEditor(decoration: $decoration, showsPreview: false)
                     Text("送信するとページは参加メンバー全員に公開され、順番が次の人に移ります。")
                         .font(.footnote).foregroundStyle(.secondary)

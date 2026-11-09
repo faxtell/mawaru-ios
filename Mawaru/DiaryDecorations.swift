@@ -15,19 +15,34 @@ struct DiaryDecoration: Codable, Equatable {
     var paper: Int = 0
     var stickers: [DiarySticker] = []
     var photos: [DiaryPastedPhoto] = []
+    var fontStyle: Int = 0
+    var fontSize: Double = 18
+    var inkStyle: Int = 0
+    var textAlignment: Int = 0
 
     // Older diary archives (v0.1–v0.3) contain no "photos" key.
-    init(paper: Int = 0, stickers: [DiarySticker] = [], photos: [DiaryPastedPhoto] = []) {
+    init(paper: Int = 0, stickers: [DiarySticker] = [], photos: [DiaryPastedPhoto] = [],
+         fontStyle: Int = 0, fontSize: Double = 18, inkStyle: Int = 0, textAlignment: Int = 0) {
         self.paper = paper
         self.stickers = stickers
         self.photos = photos
+        self.fontStyle = fontStyle
+        self.fontSize = fontSize
+        self.inkStyle = inkStyle
+        self.textAlignment = textAlignment
     }
-    private enum CodingKeys: String, CodingKey { case paper, stickers, photos }
+    private enum CodingKeys: String, CodingKey {
+        case paper, stickers, photos, fontStyle, fontSize, inkStyle, textAlignment
+    }
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         paper = try values.decodeIfPresent(Int.self, forKey: .paper) ?? 0
         stickers = try values.decodeIfPresent([DiarySticker].self, forKey: .stickers) ?? []
         photos = try values.decodeIfPresent([DiaryPastedPhoto].self, forKey: .photos) ?? []
+        fontStyle = try values.decodeIfPresent(Int.self, forKey: .fontStyle) ?? 0
+        fontSize = try values.decodeIfPresent(Double.self, forKey: .fontSize) ?? 18
+        inkStyle = try values.decodeIfPresent(Int.self, forKey: .inkStyle) ?? 0
+        textAlignment = try values.decodeIfPresent(Int.self, forKey: .textAlignment) ?? 0
     }
 
     mutating func addSticker(_ kind: String) {
@@ -39,6 +54,10 @@ struct DiaryDecoration: Codable, Equatable {
     var cloudValue: [String: Any] {
         [
             "paper": paper,
+            "fontStyle": fontStyle,
+            "fontSize": fontSize,
+            "inkStyle": inkStyle,
+            "textAlignment": textAlignment,
             "stickers": stickers.map {
                 [
                     "id": $0.id.uuidString,
@@ -87,7 +106,17 @@ struct DiaryDecoration: Codable, Equatable {
                                     scale: min(2.5, max(0.5, scale)),
                                     rotation: min(180, max(-180, rotation)))
         }
-        return DiaryDecoration(paper: validPaper, stickers: Array(elements), photos: Array(photos))
+        let style = (map["fontStyle"] as? Int ?? 0)
+        let size = (map["fontSize"] as? Double ?? 18)
+        let ink = (map["inkStyle"] as? Int ?? 0)
+        let align = (map["textAlignment"] as? Int ?? 0)
+        return DiaryDecoration(
+            paper: validPaper, stickers: Array(elements), photos: Array(photos),
+            fontStyle: (0...3).contains(style) ? style : 0,
+            fontSize: size.isFinite ? min(30, max(14, size)) : 18,
+            inkStyle: (0...3).contains(ink) ? ink : 0,
+            textAlignment: (0...2).contains(align) ? align : 0
+        )
     }
 }
 
@@ -195,13 +224,12 @@ private struct DiaryStickerShape: View {
                     }
             } else {
                 Text(item.visual)
-                    .font(.system(size: 40))
-                    .frame(width: 63, height: 63)
-                    .background(.white.opacity(0.78), in: Circle())
-                    .overlay { Circle().strokeBorder(.white.opacity(0.8), lineWidth: 2) }
+                    .font(.system(size: 49))
+                    .frame(width: 64, height: 64)
+                    .contentShape(Rectangle())
             }
         }
-        .shadow(color: .brown.opacity(0.16), radius: 2, y: 2)
+        .shadow(color: .brown.opacity(0.14), radius: 1.5, y: 2)
     }
 }
 

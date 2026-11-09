@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 // Notebook composition shared by draft, local archive and cloud pages.
 // The paper measures its real content height; stickers are overlaid at
@@ -100,6 +101,9 @@ struct NostalgicNotebookPage<Content: View>: View {
     var editing = false
     var cloudLocation: DiaryCloudPhotoLocation? = nil
     @ViewBuilder let content: () -> Content
+    @State private var canvasSize = CGSize(width: 350, height: 480)
+    @State private var dropTargeted = false
+    @State private var dropError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -134,6 +138,13 @@ struct NostalgicNotebookPage<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(minHeight: editing ? 482 : 400, alignment: .topLeading)
         .background { NostalgicNotebookPaper(style: decoration.paper) }
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { canvasSize = proxy.size }
+                    .onChange(of: proxy.size) { _, next in canvasSize = next }
+            }
+        }
         .overlay(alignment: .topLeading) {
             GeometryReader { geometry in
                 ZStack(alignment: .topLeading) {
@@ -156,8 +167,50 @@ struct NostalgicNotebookPage<Content: View>: View {
                 }
             }
         }
+        .overlay {
+            if editing && dropTargeted {
+                RoundedRectangle(cornerRadius: 23)
+                    .strokeBorder(MawaruPastel.rose, style: StrokeStyle(lineWidth: 4, dash: [10, 6]))
+                    .background(MawaruPastel.rose.opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: 23))
+                    .overlay {
+                        Label("ここにペタッ ♡", systemImage: "photo.on.rectangle.angled")
+                            .font(.headline.bold())
+                            .padding(15)
+                            .background(.white.opacity(0.92), in: Capsule())
+                    }
+                    .allowsHitTesting(false)
+            }
+        }
+        .onDrop(of: [UTType.image], isTargeted: $dropTargeted) { providers, location in
+            guard editing, decoration.photos.count < 4 else { return false }
+            return DiaryImageDropHandler.receive(providers, at: location, on: canvasSize) { image, point in
+                guard decoration.photos.count < 4 else {
+                    dropError = "写真は1ページ4枚までだよ。"
+                    return
+                }
+                do {
+                    var clipping = try DiaryPhotoVault.add(image, preferPNG: true)
+                    clipping.x = Double(point.x)
+                    clipping.y = Double(point.y)
+                    decoration.photos.append(clipping)
+                } catch {
+                    dropError = error.localizedDescription
+                }
+            } onFailure: { message in
+                dropError = message
+            }
+        }
+        .alert("写真を貼れませんでした", isPresented: Binding(
+            get: { dropError != nil },
+            set: { if !$0 { dropError = nil } }
+        )) {
+            Button("OK") { dropError = nil }
+        } message: {
+            Text(dropError ?? "")
+        }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(editing ? "ノートの本文とデコレーション" : "交換日記のページ")
+        .accessibilityLabel(editing ? "画像をドロップできるノートのページ" : "交換日記のページ")
     }
 }
 
@@ -170,8 +223,9 @@ struct NostalgicNotebookEditor: View {
         NostalgicNotebookPage(decoration: $decoration, editing: true) {
             VStack(alignment: .leading, spacing: 13) {
                 TextField("きょうのタイトル ♡", text: $title)
-                    .font(.system(.title2, design: .rounded, weight: .bold))
-                    .foregroundStyle(MawaruPastel.ink)
+                    .font(DiaryFonts.font(decoration, size: CGFloat(decoration.fontSize + 5)))
+                    .foregroundStyle(DiaryFonts.ink(decoration))
+                    .multilineTextAlignment(DiaryFonts.alignment(decoration))
                     .textFieldStyle(.plain)
                     .submitLabel(.done)
                 Rectangle()
@@ -180,15 +234,16 @@ struct NostalgicNotebookEditor: View {
                 ZStack(alignment: .topLeading) {
                     if text.isEmpty {
                         Text("今日あったこと、好きなこと、\n内緒のお話も書いてみよう… ☁️")
-                            .font(.system(.body, design: .rounded))
-                            .foregroundStyle(MawaruPastel.ink.opacity(0.47))
+                            .font(DiaryFonts.font(decoration))
+                            .foregroundStyle(DiaryFonts.ink(decoration).opacity(0.47))
                             .padding(.top, 8)
                             .allowsHitTesting(false)
                     }
                     TextEditor(text: $text)
                         .scrollContentBackground(.hidden)
-                        .font(.system(.body, design: .rounded))
-                        .foregroundStyle(MawaruPastel.ink)
+                        .font(DiaryFonts.font(decoration))
+                        .foregroundStyle(DiaryFonts.ink(decoration))
+                        .multilineTextAlignment(DiaryFonts.alignment(decoration))
                         .frame(height: 332)
                 }
             }
@@ -217,13 +272,15 @@ struct NostalgicNotebookReadPage: View {
                 .font(.system(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(MawaruPastel.ink.opacity(0.7))
                 Text(title.isEmpty ? "無題のページ ♡" : title)
-                    .font(.system(.title2, design: .rounded, weight: .bold))
-                    .foregroundStyle(MawaruPastel.ink)
+                    .font(DiaryFonts.font(decoration, size: CGFloat(decoration.fontSize + 5)))
+                    .foregroundStyle(DiaryFonts.ink(decoration))
+                    .multilineTextAlignment(DiaryFonts.alignment(decoration))
                 Rectangle().fill(MawaruPastel.rose.opacity(0.55)).frame(height: 1)
                 if !text.isEmpty {
                     Text(text)
-                        .font(.system(.body, design: .rounded))
-                        .foregroundStyle(MawaruPastel.ink)
+                        .font(DiaryFonts.font(decoration))
+                        .foregroundStyle(DiaryFonts.ink(decoration))
+                        .multilineTextAlignment(DiaryFonts.alignment(decoration))
                         .lineSpacing(9)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)

@@ -203,27 +203,40 @@ struct DiaryPastedPhotoView: View {
 
     private var photoAppearance: some View {
         Group {
-            if let loadedImage {
-                Image(uiImage: loadedImage)
-                    .resizable().scaledToFit()
+            if photo.format == "png" {
+                // iOS Photos' cut-out subject already contains an alpha channel.
+                // Do not add a white rectangle or circle behind the cut-out.
+                Group {
+                    if let loadedImage {
+                        Image(uiImage: loadedImage).resizable().scaledToFit()
+                    } else {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.title).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 126, height: 126)
+                .shadow(color: .black.opacity(0.15), radius: 3, y: 3)
             } else {
-                Image(systemName: "photo")
-                    .font(.title2).foregroundStyle(.secondary)
+                Group {
+                    if let loadedImage {
+                        Image(uiImage: loadedImage).resizable().scaledToFit()
+                    } else {
+                        Image(systemName: "photo")
+                            .font(.title2).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 108, height: 104)
+                .padding(5)
+                .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 7))
+                .shadow(color: .black.opacity(0.12), radius: 4, y: 3)
             }
         }
-        .frame(width: 98, height: 94)
-        .padding(4)
-        .background(.white.opacity(0.93), in: RoundedRectangle(cornerRadius: 8))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(.white, lineWidth: 2)
-        }
-        .shadow(color: .black.opacity(0.17), radius: 5, y: 3)
+        .contentShape(Rectangle())
         .scaleEffect(photo.scale * Double(pinched))
         .rotationEffect(.degrees(photo.rotation + spun.degrees))
         .offset(dragged)
         .position(x: canvasSize.width * photo.x, y: canvasSize.height * photo.y)
-        .accessibilityLabel("貼り付けた写真")
+        .accessibilityLabel(photo.format == "png" ? "切り抜いた画像" : "貼り付けた写真")
     }
 
     var body: some View {
@@ -234,6 +247,21 @@ struct DiaryPastedPhotoView: View {
                     .simultaneousGesture(pinchGesture)
                     .simultaneousGesture(rotateGesture)
                     .contextMenu {
+                        Button {
+                            photo.rotation = min(180, max(-180, photo.rotation + 15))
+                        } label: {
+                            Label("右に15°回転", systemImage: "rotate.right")
+                        }
+                        Button {
+                            photo.scale = min(2.5, photo.scale + 0.2)
+                        } label: {
+                            Label("少し大きく", systemImage: "plus.magnifyingglass")
+                        }
+                        Button {
+                            photo.scale = max(0.5, photo.scale - 0.2)
+                        } label: {
+                            Label("少し小さく", systemImage: "minus.magnifyingglass")
+                        }
                         Button(role: .destructive) {
                             onRemove()
                         } label: {
@@ -292,7 +320,7 @@ struct DiaryPhotoInsertionControls: View {
                 .buttonStyle(.bordered)
                 .disabled(full)
             }
-            Text("写真や画像をコピーしてペーストできます。最大4枚。透明なPNGも貼れます。")
+            Text("写真アプリで被写体を長押しして、そのままノートへドラッグ＆ドロップもできるよ！ 透明PNGは背景なしで貼れます。最大4枚。")
                 .font(.caption).foregroundStyle(.secondary)
             Text("\(decoration.photos.count)/4枚")
                 .font(.caption2).foregroundStyle(.secondary)

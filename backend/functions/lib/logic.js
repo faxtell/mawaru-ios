@@ -34,12 +34,23 @@ const stickerKinds = new Set([
 ]);
 
 function checkedDecoration(raw) {
-  if (raw == null) return {paper: 0, stickers: [], photos: []};
+  if (raw == null) return {paper: 0, stickers: [], photos: [], fontStyle: 0, fontSize: 18, inkStyle: 0, textAlignment: 0};
   if (typeof raw !== "object" || Array.isArray(raw) ||
       !Number.isInteger(raw.paper) || raw.paper < 0 || raw.paper > 3 ||
       !Array.isArray(raw.stickers) || raw.stickers.length > 24 ||
       (raw.photos !== undefined && (!Array.isArray(raw.photos) || raw.photos.length > 4))) {
     throw new Error("Invalid page decoration");
+  }
+
+  const style = raw.fontStyle ?? 0;
+  const size = raw.fontSize ?? 18;
+  const ink = raw.inkStyle ?? 0;
+  const alignment = raw.textAlignment ?? 0;
+  if (!Number.isInteger(style) || style < 0 || style > 3 ||
+      !Number.isFinite(size) || size < 14 || size > 30 ||
+      !Number.isInteger(ink) || ink < 0 || ink > 3 ||
+      !Number.isInteger(alignment) || alignment < 0 || alignment > 2) {
+    throw new Error("Invalid notebook typography");
   }
 
   const ids = new Set();
@@ -75,7 +86,10 @@ function checkedDecoration(raw) {
     return {id, format: p.format, x: p.x, y: p.y,
       scale: p.scale, rotation: p.rotation};
   });
-  return {paper: raw.paper, stickers, photos};
+  return {
+    paper: raw.paper, stickers, photos,
+    fontStyle: style, fontSize: size, inkStyle: ink, textAlignment: alignment
+  };
 }
 
 module.exports = {shortText, nextTurn, isValidRequestId, normalizedInvite, checkedDecoration};

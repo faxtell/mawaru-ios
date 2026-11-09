@@ -12,3 +12,7 @@ backend/functions/.env*
 *.p8
 *.p12
 *.mobileprovision
+
+# Downloaded licensed fonts: bundled by CI, not committed
+Mawaru/Fonts/*.ttf
+Mawaru/Fonts/*.license.txt

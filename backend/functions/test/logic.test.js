@@ -37,7 +37,10 @@ test("a valid sticker sheet is retained and normalized", () => {
   assert.equal(result.paper, 2);
   assert.equal(result.stickers[0].kind, "tapePink");
   assert.equal(result.stickers[0].id, input.stickers[0].id.toUpperCase());
-  assert.deepEqual(checkedDecoration(), {paper: 0, stickers: [], photos: []});
+  assert.deepEqual(checkedDecoration(), {
+    paper: 0, stickers: [], photos: [],
+    fontStyle: 0, fontSize: 18, inkStyle: 0, textAlignment: 0
+  });
 });
 test("invalid decoration, sticker sizes and duplicate IDs are rejected", () => {
   const s = {
@@ -69,4 +72,24 @@ test("oversized, repeated, and malformed photo stickers fail", () => {
   assert.throws(() => checkedDecoration(ok([{...photo, x:-1}])));
   assert.throws(() => checkedDecoration(ok([{...photo, id:"../escape"}])));
   assert.throws(() => checkedDecoration(ok(Array(5).fill(photo))));
+});
+
+test("handwriting font choice and ink are checked and persisted", () => {
+  const result = checkedDecoration({
+    paper: 1, stickers: [], photos: [],
+    fontStyle: 2, fontSize: 23, inkStyle: 1, textAlignment: 1
+  });
+  assert.equal(result.fontStyle, 2);
+  assert.equal(result.fontSize, 23);
+  assert.equal(result.inkStyle, 1);
+  assert.equal(result.textAlignment, 1);
+});
+test("invalid font styles, sizes and alignment cannot be submitted", () => {
+  const raw = {paper: 0, stickers: [], photos: []};
+  assert.throws(() => checkedDecoration({...raw, fontStyle: -1}));
+  assert.throws(() => checkedDecoration({...raw, fontStyle: 99}));
+  assert.throws(() => checkedDecoration({...raw, fontSize: 0}));
+  assert.throws(() => checkedDecoration({...raw, fontSize: 10000}));
+  assert.throws(() => checkedDecoration({...raw, inkStyle: 10}));
+  assert.throws(() => checkedDecoration({...raw, textAlignment: 7}));
 });
