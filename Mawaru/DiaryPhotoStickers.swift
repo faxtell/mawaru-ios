@@ -58,6 +58,11 @@ enum DiaryPhotoVault {
         data(for: photo).flatMap { UIImage(data: $0) }
     }
 
+    static func remove(_ photo: DiaryPastedPhoto) {
+        guard ["jpg", "png"].contains(photo.format) else { return }
+        try? FileManager.default.removeItem(at: fileURL(photo))
+    }
+
     static func cache(_ raw: Data, for photo: DiaryPastedPhoto) throws {
         guard raw.count <= 2_000_000, !raw.isEmpty,
               UIImage(data: raw) != nil,
@@ -263,6 +268,7 @@ struct DiaryPastedPhotoView: View {
                             Label("少し小さく", systemImage: "minus.magnifyingglass")
                         }
                         Button(role: .destructive) {
+                            DiaryPhotoVault.remove(photo)
                             onRemove()
                         } label: {
                             Label("写真を剥がす", systemImage: "trash")

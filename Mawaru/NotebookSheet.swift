@@ -136,7 +136,7 @@ struct NostalgicNotebookPage<Content: View>: View {
         .padding(.leading, 52)
         .padding(.trailing, 22)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(minHeight: editing ? 482 : 400, alignment: .topLeading)
+        .frame(minHeight: 540, alignment: .topLeading)
         .background { NostalgicNotebookPaper(style: decoration.paper) }
         .background {
             GeometryReader { proxy in
@@ -214,39 +214,21 @@ struct NostalgicNotebookPage<Content: View>: View {
     }
 }
 
+// Both modes call the same writing-content view so all text frames,
+// margins, and line layout match exactly after a page is passed.
 struct NostalgicNotebookEditor: View {
     @Binding var title: String
     @Binding var text: String
     @Binding var decoration: DiaryDecoration
+    var author = "わたし"
+    var date = Date.now
 
     var body: some View {
         NostalgicNotebookPage(decoration: $decoration, editing: true) {
-            VStack(alignment: .leading, spacing: 13) {
-                TextField("きょうのタイトル ♡", text: $title)
-                    .font(DiaryFonts.font(decoration, size: CGFloat(decoration.fontSize + 5)))
-                    .foregroundStyle(DiaryFonts.ink(decoration))
-                    .multilineTextAlignment(DiaryFonts.alignment(decoration))
-                    .textFieldStyle(.plain)
-                    .submitLabel(.done)
-                Rectangle()
-                    .fill(MawaruPastel.rose.opacity(0.7))
-                    .frame(height: 1)
-                ZStack(alignment: .topLeading) {
-                    if text.isEmpty {
-                        Text("今日あったこと、好きなこと、\n内緒のお話も書いてみよう… ☁️")
-                            .font(DiaryFonts.font(decoration))
-                            .foregroundStyle(DiaryFonts.ink(decoration).opacity(0.47))
-                            .padding(.top, 8)
-                            .allowsHitTesting(false)
-                    }
-                    TextEditor(text: $text)
-                        .scrollContentBackground(.hidden)
-                        .font(DiaryFonts.font(decoration))
-                        .foregroundStyle(DiaryFonts.ink(decoration))
-                        .multilineTextAlignment(DiaryFonts.alignment(decoration))
-                        .frame(height: 332)
-                }
-            }
+            DiaryPageWritingContent(
+                title: $title, text: $text, decoration: decoration,
+                editable: true, author: author, date: date
+            )
         }
     }
 }
@@ -261,38 +243,28 @@ struct NostalgicNotebookReadPage: View {
     var cloudLocation: DiaryCloudPhotoLocation? = nil
 
     var body: some View {
-        NostalgicNotebookPage(decoration: .constant(decoration),
-                              editing: false, cloudLocation: cloudLocation) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 8) {
-                    Text(date, format: .dateTime.year().month().day())
-                    Spacer()
-                    Text("from  \(author)")
-                }
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(MawaruPastel.ink.opacity(0.7))
-                Text(title.isEmpty ? "無題のページ ♡" : title)
-                    .font(DiaryFonts.font(decoration, size: CGFloat(decoration.fontSize + 5)))
-                    .foregroundStyle(DiaryFonts.ink(decoration))
-                    .multilineTextAlignment(DiaryFonts.alignment(decoration))
-                Rectangle().fill(MawaruPastel.rose.opacity(0.55)).frame(height: 1)
-                if !text.isEmpty {
-                    Text(text)
-                        .font(DiaryFonts.font(decoration))
-                        .foregroundStyle(DiaryFonts.ink(decoration))
-                        .multilineTextAlignment(DiaryFonts.alignment(decoration))
-                        .lineSpacing(9)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if let attachedPhoto {
-                    Image(uiImage: attachedPhoto)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .padding(.vertical, 7)
-                }
+        VStack(spacing: 14) {
+            NostalgicNotebookPage(
+                decoration: .constant(decoration),
+                editing: false, cloudLocation: cloudLocation
+            ) {
+                DiaryPageWritingContent(
+                    title: .constant(title.isEmpty ? "無題のページ ♡" : title),
+                    text: .constant(text), decoration: decoration,
+                    editable: false, author: author, date: date
+                )
+            }
+            // Legacy fixed attachments stay OUTSIDE the positioned page.
+            // Otherwise a photo changes canvas height and moves all stickers.
+            if let attachedPhoto {
+                Image(uiImage: attachedPhoto)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 15))
+                    .padding(12)
+                    .background(.white.opacity(0.88),
+                                in: RoundedRectangle(cornerRadius: 20))
             }
         }
     }

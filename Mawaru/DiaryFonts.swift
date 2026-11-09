@@ -29,6 +29,26 @@ enum DiaryFonts {
         return .system(size: size, design: .rounded)
     }
 
+    static func uiFont(_ decoration: DiaryDecoration, size: CGFloat? = nil) -> UIFont {
+        let requested = size ?? CGFloat(decoration.fontSize)
+        let pointSize = min(40, max(12, requested))
+        if (1...3).contains(decoration.fontStyle),
+           let selected = UIFont(name: postScriptNames[decoration.fontStyle - 1], size: pointSize) {
+            return selected
+        }
+        let normal = UIFont.systemFont(ofSize: pointSize)
+        guard let rounded = normal.fontDescriptor.withDesign(.rounded) else { return normal }
+        return UIFont(descriptor: rounded, size: pointSize)
+    }
+
+    static func uiAlignment(_ decoration: DiaryDecoration) -> NSTextAlignment {
+        switch decoration.textAlignment {
+        case 1: .center
+        case 2: .right
+        default: .left
+        }
+    }
+
     static func ink(_ decoration: DiaryDecoration) -> Color {
         switch decoration.inkStyle {
         case 1: Color(red: 0.19, green: 0.35, blue: 0.61)
@@ -49,6 +69,7 @@ enum DiaryFonts {
 
 struct DiaryTypographyControls: View {
     @Binding var decoration: DiaryDecoration
+    var resetToSavedPreference = false
 
     private let inkNames = ["こげ茶", "ブルー", "ピンク", "グリーン"]
 
@@ -126,11 +147,14 @@ struct DiaryTypographyControls: View {
                 .frame(maxWidth: 230)
             }
 
-            Button("文字の設定をリセット", systemImage: "arrow.counterclockwise") {
-                decoration.fontStyle = 0
-                decoration.fontSize = 18
-                decoration.inkStyle = 0
-                decoration.textAlignment = 0
+            Button(resetToSavedPreference ? "いつもの設定に戻す" : "初期設定に戻す",
+                   systemImage: "arrow.counterclockwise") {
+                let stored = resetToSavedPreference ?
+                    DiaryTypographyPreferences.load() : DiaryDecoration()
+                decoration.fontStyle = stored.fontStyle
+                decoration.fontSize = stored.fontSize
+                decoration.inkStyle = stored.inkStyle
+                decoration.textAlignment = stored.textAlignment
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -138,5 +162,31 @@ struct DiaryTypographyControls: View {
         .padding(16)
         .background(MawaruPastel.lavender.opacity(0.27),
                     in: RoundedRectangle(cornerRadius: 22))
+    }
+}
+
+// User-wide defaults are applied ONLY when starting a new page. Each page
+// retains its own typography, so past diaries never change when defaults do.
+enum DiaryTypographyPreferences {
+    static let paperKey = "mawaru.page.defaultPaper"
+    static let fontStyleKey = "mawaru.fonts.defaultStyle"
+    static let fontSizeKey = "mawaru.fonts.defaultSize"
+    static let inkStyleKey = "mawaru.fonts.defaultInk"
+    static let alignmentKey = "mawaru.fonts.defaultAlignment"
+
+    static func load() -> DiaryDecoration {
+        let prefs = UserDefaults.standard
+        let paper = prefs.object(forKey: paperKey) as? Int ?? 0
+        let style = prefs.object(forKey: fontStyleKey) as? Int ?? 0
+        let size = prefs.object(forKey: fontSizeKey) as? Double ?? 18
+        let ink = prefs.object(forKey: inkStyleKey) as? Int ?? 0
+        let alignment = prefs.object(forKey: alignmentKey) as? Int ?? 0
+        return DiaryDecoration(
+            paper: (0...3).contains(paper) ? paper : 0,
+            fontStyle: (0...3).contains(style) ? style : 0,
+            fontSize: size.isFinite ? min(30, max(14, size)) : 18,
+            inkStyle: (0...3).contains(ink) ? ink : 0,
+            textAlignment: (0...2).contains(alignment) ? alignment : 0
+        )
     }
 }

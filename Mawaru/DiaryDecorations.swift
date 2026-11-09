@@ -293,6 +293,18 @@ struct DiaryMovableSticker: View {
                 .simultaneousGesture(pinch)
                 .simultaneousGesture(rotate)
                 .contextMenu {
+                    Button {
+                        sticker.rotation = 0
+                        sticker.scale = 1
+                    } label: {
+                        Label("向きと大きさを戻す", systemImage: "arrow.counterclockwise")
+                    }
+                    Button {
+                        sticker.x = 0.5
+                        sticker.y = 0.4
+                    } label: {
+                        Label("ノート中央へ移動", systemImage: "scope")
+                    }
                     Button(role: .destructive) {
                         onRemove()
                     } label: {
@@ -369,11 +381,32 @@ struct DiaryDecorationEditor: View {
                 Spacer()
                 if !decoration.stickers.isEmpty || !decoration.photos.isEmpty {
                     Menu {
-                        Button("シールを全部剥がす", systemImage: "trash", role: .destructive) {
-                            decoration.stickers.removeAll()
-                            decoration.photos.removeAll()
+                        if !decoration.stickers.isEmpty {
+                            Button {
+                                decoration.stickers.removeLast()
+                            } label: {
+                                Label("最後のシールを1枚戻す", systemImage: "arrow.uturn.backward")
+                            }
+                            Button(role: .destructive) {
+                                decoration.stickers.removeAll()
+                            } label: {
+                                Label("シールだけ全部剥がす", systemImage: "trash")
+                            }
                         }
-                    } label: { Image(systemName: "ellipsis.circle") }
+                        if !decoration.photos.isEmpty {
+                            Button(role: .destructive) {
+                                for photo in decoration.photos {
+                                    DiaryPhotoVault.remove(photo)
+                                }
+                                decoration.photos.removeAll()
+                            } label: {
+                                Label("写真だけ全部剥がす", systemImage: "photo.badge.minus")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .accessibilityLabel("デコレーション操作")
+                    }
                 }
             }
             if showsPreview {
@@ -404,7 +437,13 @@ struct DiaryDecorationEditor: View {
                     }
                 }
             }
-            Text("\(decoration.stickers.count)/24枚").font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Text("シール \(decoration.stickers.count)/24枚")
+                Spacer()
+                Text("貼り付け画像 \(decoration.photos.count)/4枚")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
             Text("ノートの紙").font(.subheadline.bold())
             HStack(spacing: 8) {
                 ForEach(0..<4, id: \.self) { index in

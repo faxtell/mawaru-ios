@@ -382,6 +382,9 @@ struct SharedEditorScreen: View {
     @State private var bodyText = ""
     @State private var requestID = UUID().uuidString
     @State private var decoration = DiaryDecoration()
+    @State private var preview = false
+    @State private var showTextTools = false
+    @State private var confirmPass = false
     @State private var ready = false
     @State private var busy = false
     @State private var error: String?
@@ -400,13 +403,43 @@ struct SharedEditorScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 15) {
                     MawaruSectionLabel(step: "01", title: "きょうのノート", symbol: "pencil.and.scribble")
-                    NostalgicNotebookEditor(title: $title, text: $bodyText, decoration: $decoration)
+                    HStack {
+                        Spacer()
+                        Button {
+                            preview.toggle()
+                            saveDraft()
+                        } label: {
+                            Label(preview ? "編集に戻る" : "完成プレビュー",
+                                  systemImage: preview ? "pencil" : "eye")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(DiaryStyle.ink)
+                    }
+                    if preview {
+                        NostalgicNotebookReadPage(
+                            title: title, text: bodyText,
+                            author: shared.displayName,
+                            date: .now, decoration: decoration
+                        )
+                    } else {
+                        NostalgicNotebookEditor(
+                            title: $title, text: $bodyText, decoration: $decoration,
+                            author: shared.displayName
+                        )
                         .onChange(of: title) { _, _ in saveDraft() }
                         .onChange(of: bodyText) { _, _ in saveDraft() }
-                        .onChange(of: decoration) { _, _ in saveDraft() }
-                    MawaruSectionLabel(step: "02", title: "文字をアレンジ", symbol: "textformat")
-                    DiaryTypographyControls(decoration: $decoration)
-                        .onChange(of: decoration) { _, _ in saveDraft() }
+                    }
+                    DisclosureGroup(isExpanded: $showTextTools) {
+                        DiaryTypographyControls(
+                            decoration: $decoration, resetToSavedPreference: true
+                        )
+                        .padding(.top, 8)
+                    } label: {
+                        MawaruSectionLabel(step: "02",
+                            title: "このページだけ文字を変更", symbol: "textformat")
+                    }
+                    .tint(DiaryStyle.ink)
+                    .onChange(of: decoration) { _, _ in saveDraft() }
                     MawaruSectionLabel(step: "03", title: "好きなシールを貼ろう", symbol: "sparkles")
                     DiaryDecorationEditor(decoration: $decoration, showsPreview: false)
                     Text("送信するとページは参加メンバー全員に公開され、順番が次の人に移ります。")
@@ -424,18 +457,8 @@ struct SharedEditorScreen: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(busy ? "送信中" : "次へ渡す") {
-                        busy = true
                         saveDraft()
-                        Task {
-                            do {
-                                try await shared.submit(bookID: bookID,
-                                    requestID: requestID, title: title, body: bodyText,
-                                    decoration: decoration)
-                                UserDefaults.standard.removeObject(forKey: key)
-                                dismiss()
-                            } catch { self.error = error.localizedDescription }
-                            busy = false
-                        }
+                        confirmPass = true
                     }
                     .disabled(busy ||
                               (bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -451,9 +474,35 @@ struct SharedEditorScreen: View {
                     if let data = draft["decoration"] as? Data,
                        let saved = try? JSONDecoder().decode(DiaryDecoration.self, from: data) {
                         decoration = saved
+                    } else {
+                        decoration = DiaryTypographyPreferences.load()
                     }
+                } else {
+                    decoration = DiaryTypographyPreferences.load()
                 }
                 ready = true
+            }
+            .confirmationDialog("このページを次の人へ渡す？",
+                                isPresented: $confirmPass) {
+                Button("デコったページを渡す ♡") {
+                    guard !busy else { return }
+                    busy = true
+                    saveDraft()
+                    Task {
+                        do {
+                            try await shared.submit(bookID: bookID,
+                                requestID: requestID, title: title, body: bodyText,
+                                decoration: decoration)
+                            UserDefaults.standard.removeObject(forKey: key)
+                            dismiss()
+                        } catch {
+                            self.error = error.localizedDescription
+                        }
+                        busy = false
+                    }
+                }
+            } message: {
+                Text("送信すると、メンバーに公開されて次の人の番になります。")
             }
             .alert("日記を渡せませんでした", isPresented: Binding(
                 get: { error != nil }, set: { if !$0 { error = nil } })) {

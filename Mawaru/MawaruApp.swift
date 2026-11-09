@@ -113,7 +113,18 @@ final class DiaryStore: ObservableObject {
         return String(data: data, encoding: .utf8) ?? "{}"
     }
     func eraseAll() {
-        try? FileManager.default.removeItem(at: folder)
+        let applicationSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        )[0]
+        for folderName in ["Mawaru", "MawaruClippings", "MawaruDraftAttachments"] {
+            try? FileManager.default.removeItem(
+                at: applicationSupport.appendingPathComponent(folderName, isDirectory: true)
+            )
+        }
+        for key in UserDefaults.standard.dictionaryRepresentation().keys
+            where key.hasPrefix("mawaru.draft.") {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
         books = []
         entries = []
     }
@@ -424,6 +435,9 @@ struct DiaryEditorScreen: View {
     @State private var ready = false
     @State private var failed = false
     @State private var decoration = DiaryDecoration()
+    @State private var preview = false
+    @State private var showTextTools = false
+    @State private var confirmPass = false
     private var draftKey: String { "mawaru.draft.\(bookID.uuidString)" }
     private func saveDraft() {
         guard ready else { return }
@@ -436,22 +450,64 @@ struct DiaryEditorScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     MawaruSectionLabel(step: "01", title: "ノートに書こう", symbol: "pencil.and.scribble")
-                    NostalgicNotebookEditor(title: $title, text: $text, decoration: $decoration)
+                    HStack {
+                        Spacer()
+                        Button {
+                            preview.toggle()
+                            saveDraft()
+                        } label: {
+                            Label(preview ? "編集に戻る" : "完成プレビュー",
+                                  systemImage: preview ? "pencil" : "eye")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(DiaryStyle.ink)
+                    }
+                    if preview {
+                        NostalgicNotebookReadPage(
+                            title: title, text: text,
+                            author: store.books.first(where: { $0.id == bookID })?.currentWriter ?? "わたし",
+                            date: .now, decoration: decoration,
+                            attachedPhoto: photo.flatMap { UIImage(data: $0) }
+                        )
+                    } else {
+                        NostalgicNotebookEditor(
+                            title: $title, text: $text, decoration: $decoration,
+                            author: store.books.first(where: { $0.id == bookID })?.currentWriter ?? "わたし"
+                        )
                         .onChange(of: title) { _, _ in saveDraft() }
                         .onChange(of: text) { _, _ in saveDraft() }
-                        .onChange(of: decoration) { _, _ in saveDraft() }
-                    MawaruSectionLabel(step: "02", title: "文字をアレンジ", symbol: "textformat")
-                    DiaryTypographyControls(decoration: $decoration)
+                    }
+                    DisclosureGroup(isExpanded: $showTextTools) {
+                        DiaryTypographyControls(
+                            decoration: $decoration, resetToSavedPreference: true
+                        )
+                        .padding(.top, 8)
+                    } label: {
+                        MawaruSectionLabel(step: "02",
+                            title: "このページだけ文字を変更", symbol: "textformat")
+                    }
+                    .tint(DiaryStyle.ink)
+                    .onChange(of: decoration) { _, _ in saveDraft() }
                     MawaruSectionLabel(step: "03", title: "写真とシールでデコろう", symbol: "sparkles")
                     if let photo, let image = UIImage(data: photo) {
                         Image(uiImage: image).resizable().scaledToFit()
                             .frame(maxHeight: 240)
-                        Button("写真を取り消す", role: .destructive) { self.photo = nil }
+                        Button("写真を取り消す", role: .destructive) {
+                            self.photo = nil
+                            DiaryDraftAttachmentStorage.remove(bookID: bookID)
+                        }
                     }
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         Label("写真を1枚添える", systemImage: "photo.badge.plus")
                     }
                     DiaryDecorationEditor(decoration: $decoration, showsPreview: false)
+                    HStack {
+                        Text("本文 (text.count)/5000文字")
+                        Spacer()
+                        Text("タイトル (title.count)/80文字")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(text.count > 5000 || title.count > 80 ? Color.red : Color.secondary)
                     Text("シールは文字の上にも貼れるよ。完成したらバトンを渡そう ♡")
                         .font(.footnote).foregroundStyle(.secondary)
                 }.padding(18)
@@ -462,23 +518,41 @@ struct DiaryEditorScreen: View {
                 ToolbarItem(placement: .cancellationAction) { Button("閉じる") { saveDraft(); dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("次へ渡す") {
-                        if store.submit(bookID: bookID, title: title, text: text, photo: photo, decoration: decoration) {
-                            UserDefaults.standard.removeObject(forKey: draftKey)
-                            dismiss()
-                        } else { failed = true }
+                        saveDraft()
+                        confirmPass = true
                     }
                     .fontWeight(.semibold)
-                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                              photo == nil && decoration.photos.isEmpty)
+                    .disabled((text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                               photo == nil && decoration.photos.isEmpty) ||
+                              text.count > 5000 || title.count > 80)
                 }
             }
             .onAppear {
+                photo = DiaryDraftAttachmentStorage.load(bookID: bookID)
                 if let data = UserDefaults.standard.data(forKey: draftKey),
                    let draft = try? JSONDecoder().decode(DiaryDraft.self, from: data) {
-                    title = draft.title; text = draft.text
-                    decoration = draft.decoration ?? DiaryDecoration()
+                    title = draft.title
+                    text = draft.text
+                    decoration = draft.decoration ?? DiaryTypographyPreferences.load()
+                } else {
+                    decoration = DiaryTypographyPreferences.load()
                 }
                 ready = true
+            }
+            .confirmationDialog("このページを次の人へ渡す？",
+                                isPresented: $confirmPass) {
+                Button("デコったページを渡す ♡") {
+                    if store.submit(bookID: bookID, title: title, text: text,
+                                    photo: photo, decoration: decoration) {
+                        UserDefaults.standard.removeObject(forKey: draftKey)
+                        DiaryDraftAttachmentStorage.remove(bookID: bookID)
+                        dismiss()
+                    } else {
+                        failed = true
+                    }
+                }
+            } message: {
+                Text("一度渡すとこのページは編集できないよ。")
             }
             .onChange(of: selectedPhoto) { _, item in
                 Task {
@@ -487,7 +561,12 @@ struct DiaryEditorScreen: View {
                        let image = UIImage(data: data),
                        let jpeg = image.jpegData(compressionQuality: 0.75),
                        jpeg.count <= 8_000_000 {
-                        photo = jpeg
+                        do {
+                            try DiaryDraftAttachmentStorage.save(jpeg, bookID: bookID)
+                            photo = jpeg
+                        } catch {
+                            failed = true
+                        }
                     } else if item != nil { failed = true }
                 }
             }
@@ -568,28 +647,88 @@ struct MemoriesScreen: View {
 
 struct SettingsScreen: View {
     @EnvironmentObject private var store: DiaryStore
+    @AppStorage(DiaryTypographyPreferences.paperKey) private var defaultPaper = 0
+    @AppStorage(DiaryTypographyPreferences.fontStyleKey) private var defaultFontStyle = 0
+    @AppStorage(DiaryTypographyPreferences.fontSizeKey) private var defaultFontSize = 18.0
+    @AppStorage(DiaryTypographyPreferences.inkStyleKey) private var defaultInkStyle = 0
+    @AppStorage(DiaryTypographyPreferences.alignmentKey) private var defaultAlignment = 0
     @State private var confirmErase = false
+
+    private var typographyBinding: Binding<DiaryDecoration> {
+        Binding(
+            get: {
+                DiaryDecoration(
+                    paper: defaultPaper,
+                    fontStyle: defaultFontStyle, fontSize: defaultFontSize,
+                    inkStyle: defaultInkStyle, textAlignment: defaultAlignment
+                )
+            },
+            set: { value in
+                defaultPaper = value.paper
+                defaultFontStyle = value.fontStyle
+                defaultFontSize = value.fontSize
+                defaultInkStyle = value.inkStyle
+                defaultAlignment = value.textAlignment
+            }
+        )
+    }
+
     var body: some View {
         Form {
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("いつもの文字を選ぼう ♡")
+                        .font(.system(.title3, design: .rounded, weight: .bold))
+                    Text("ここで選んだフォント・大きさ・色は、これから書く日記に自動で使われます。毎回選び直す必要はないよ。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Picker("いつものノート用紙", selection: $defaultPaper) {
+                        Text("クリーム").tag(0)
+                        Text("さくら").tag(1)
+                        Text("ミント").tag(2)
+                        Text("ラベンダー").tag(3)
+                    }
+                    .pickerStyle(.segmented)
+                    DiaryTypographyControls(decoration: typographyBinding)
+                    Text("きょうも楽しい一日になりますように。")
+                        .font(DiaryFonts.font(typographyBinding.wrappedValue))
+                        .foregroundStyle(DiaryFonts.ink(typographyBinding.wrappedValue))
+                        .multilineTextAlignment(DiaryFonts.alignment(typographyBinding.wrappedValue))
+                        .frame(maxWidth: .infinity)
+                        .padding(15)
+                        .background(MawaruPastel.lemon.opacity(0.28),
+                                    in: RoundedRectangle(cornerRadius: 14))
+                    Text("過去の日記や保存中の下書きの文字設定は変わりません。日記を書いている途中でも、そのページだけ変更できます。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 6)
+            } header: {
+                Label("日記の標準フォント・文字設定", systemImage: "character.cursor.ibeam")
+            }
             Section("アプリについて") {
                 LabeledContent("アプリ名", value: "まわる")
-                LabeledContent("バージョン", value: "0.6.0")
-                LabeledContent("データ保存", value: "このiPhone内")
+                LabeledContent("バージョン", value: "0.7.0")
+                LabeledContent("ローカル日記", value: "このiPhone内")
             }
             Section("データ管理") {
                 ShareLink(item: store.exportJSON()) {
                     Label("日記データをテキストで共有", systemImage: "square.and.arrow.up")
                 }
-                Button("この端末の日記データを削除", role: .destructive) { confirmErase = true }
+                Button("この端末の日記データを削除", role: .destructive) {
+                    confirmErase = true
+                }
             }
             Section {
-                Text("ローカル日記はこのiPhone内に保存されます。シールや紙のデコレーションに対応。共有機能はFirebase接続後に使えます。通知、課金、写真を含む完全なデータ出力は未対応です。")
+                Text("ローカル日記の画像はこのiPhone内に保存されます。共有日記はFirebaseを設定した場合のみ使えます。エクスポートには画像本体を含みません。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(DiaryStyle.background.opacity(0.45))
         .navigationTitle("設定")
         .confirmationDialog("すべての日記を削除しますか？", isPresented: $confirmErase) {
             Button("すべて削除", role: .destructive) { store.eraseAll() }
-        } message: { Text("この端末のデータを削除します。元には戻せません。") }
+        } message: {
+            Text("この端末の日記データを削除します。元には戻せません。")
+        }
     }
 }
