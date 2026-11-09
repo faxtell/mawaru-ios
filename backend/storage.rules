@@ -1,0 +1,51 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function book(bookId) {
+      return firestore.get(/databases/(default)/documents/notebooks/$(bookId)).data;
+    }
+    function member(bookId) {
+      return signedIn() && request.auth.uid in book(bookId).memberIds;
+    }
+    function currentWriter(bookId) {
+      return book(bookId).memberIds.size() >= 2 &&
+        book(bookId).currentTurn < book(bookId).memberIds.size() &&
+        book(bookId).memberIds[book(bookId).currentTurn] == request.auth.uid &&
+        book(bookId).paused == false;
+    }
+
+    // Photos are immutable. Only notebook members may read them. An author
+    // can create images for a pending entry only while holding the baton.
+    match /notebooks/{bookId}/entry-assets/{entryId}/{ownerUid}/{filename} {
+      allow read: if member(bookId);
+      allow create: if member(bookId) &&
+        request.auth.uid == ownerUid &&
+        currentWriter(bookId) &&
+        entryId.matches('^[0-9A-Fa-f-]{36}$') &&
+        filename.matches('^[0-9A-Fa-f-]{36}[.](jpg|png) &&
+        request.resource.size > 0 &&
+        request.resource.size <= 1500000 &&
+        request.resource.contentType in ['image/jpeg', 'image/png'] &&
+        request.resource.metadata.ownerUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+) &&
+        request.resource.size > 0 &&
+        request.resource.size <= 1500000 &&
+        request.resource.contentType in ['image/jpeg', 'image/png'] &&
+        request.resource.metadata.ownerUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

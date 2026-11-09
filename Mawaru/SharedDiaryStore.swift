@@ -53,6 +53,7 @@ struct SharedBook: Identifiable {
 struct SharedPage: Identifiable {
     let id: String
     let author: String
+    let authorID: String
     let title: String
     let body: String
     let sequence: Int
@@ -62,10 +63,12 @@ struct SharedPage: Identifiable {
     init?(document: QueryDocumentSnapshot) {
         let data = document.data()
         guard let author = data["authorName"] as? String,
+              let authorID = data["authorId"] as? String,
               let title = data["title"] as? String,
               let body = data["body"] as? String else { return nil }
         id = document.documentID
         self.author = author
+        self.authorID = authorID
         self.title = title
         self.body = body
         sequence = data["sequence"] as? Int ?? 0
@@ -194,6 +197,13 @@ final class SharedDiaryStore: ObservableObject {
         return code
     }
     func submit(bookID: String, requestID: String, title: String, body: String, decoration: DiaryDecoration) async throws {
+        guard let uid else { throw DiaryPhotoError.notConfigured }
+        let location = DiaryCloudPhotoLocation(bookID: bookID, entryID: requestID, authorID: uid)
+        // Keep the same requestID for retries. The server verifies these objects
+        // exist and belong to the current writer before committing the baton.
+        for photo in decoration.photos {
+            try await DiaryCloudPhotos.upload(photo, location: location)
+        }
         _ = try await call("submitEntry", data: [
             "bookId": bookID, "requestId": requestID,
             "title": title, "body": body, "decoration": decoration.cloudValue

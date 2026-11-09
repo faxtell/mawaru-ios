@@ -34,7 +34,7 @@ const stickerKinds = new Set([
 ]);
 
 function checkedDecoration(raw) {
-  if (raw == null) return {paper: 0, stickers: []};
+  if (raw == null) return {paper: 0, stickers: [], photos: []};
   if (typeof raw !== "object" || Array.isArray(raw) ||
       !Number.isInteger(raw.paper) || raw.paper < 0 || raw.paper > 3 ||
       !Array.isArray(raw.stickers) || raw.stickers.length > 24) {

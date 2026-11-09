@@ -29,6 +29,8 @@ targets:
         product: FirebaseFirestore
       - package: Firebase
         product: FirebaseFunctions
+      - package: Firebase
+        product: FirebaseStorage
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.mawaru.diary
@@ -36,8 +38,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: 'まわる'
         INFOPLIST_KEY_UILaunchScreen_Generation: 'YES'
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: '交換日記に写真を添付するために写真を選択します。'
-        MARKETING_VERSION: 0.3.0
-        CURRENT_PROJECT_VERSION: 3
+        MARKETING_VERSION: 0.4.0
+        CURRENT_PROJECT_VERSION: 4
         GENERATE_INFOPLIST_FILE: YES
         SUPPORTS_MACCATALYST: NO
     scheme:

@@ -37,7 +37,7 @@ test("a valid sticker sheet is retained and normalized", () => {
   assert.equal(result.paper, 2);
   assert.equal(result.stickers[0].kind, "tapePink");
   assert.equal(result.stickers[0].id, input.stickers[0].id.toUpperCase());
-  assert.deepEqual(checkedDecoration(), {paper: 0, stickers: []});
+  assert.deepEqual(checkedDecoration(), {paper: 0, stickers: [], photos: []});
 });
 test("invalid decoration, sticker sizes and duplicate IDs are rejected", () => {
   const s = {
@@ -50,4 +50,23 @@ test("invalid decoration, sticker sizes and duplicate IDs are rejected", () => {
   assert.throws(() => checkedDecoration({paper: 0, stickers: [{...s, scale: 40}]}));
   assert.throws(() => checkedDecoration({paper: 0, stickers: [{...s, kind: "not-a-sticker"}]}));
   assert.throws(() => checkedDecoration({paper: 0, stickers: Array(25).fill(s)}));
+});
+
+test("a copied photo with bounded position and format passes validation", () => {
+  const photo = {id: "a04092ff-a08b-48e0-a67c-4f9c604270a0", format: "png",
+    x: 0.55, y: 0.45, scale: 1.2, rotation: 8};
+  const result = checkedDecoration({paper: 1, stickers: [], photos: [photo]});
+  assert.equal(result.photos.length, 1);
+  assert.equal(result.photos[0].format, "png");
+  assert.equal(result.photos[0].id, photo.id.toUpperCase());
+});
+test("oversized, repeated, and malformed photo stickers fail", () => {
+  const photo = {id: "a04092ff-a08b-48e0-a67c-4f9c604270a0", format: "jpg",
+    x: 0.5, y: 0.5, scale: 1, rotation: 0};
+  const ok = (photos) => ({paper: 0, stickers: [], photos});
+  assert.throws(() => checkedDecoration(ok([photo, photo])));
+  assert.throws(() => checkedDecoration(ok([{...photo, format:"gif"}])));
+  assert.throws(() => checkedDecoration(ok([{...photo, x:-1}])));
+  assert.throws(() => checkedDecoration(ok([{...photo, id:"../escape"}])));
+  assert.throws(() => checkedDecoration(ok(Array(5).fill(photo))));
 });

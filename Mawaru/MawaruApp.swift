@@ -77,7 +77,8 @@ final class DiaryStore: ObservableObject {
     }
     @discardableResult func submit(bookID: UUID, title: String, text: String, photo: Data?, decoration: DiaryDecoration = DiaryDecoration()) -> Bool {
         guard let i = books.firstIndex(where: { $0.id == bookID }), books[i].isMyTurn,
-              (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false || photo != nil) else { return false }
+              (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ||
+               photo != nil || !decoration.photos.isEmpty) else { return false }
         let author = books[i].currentWriter
         var item = DiaryEntry(bookID: bookID, author: author, title: title, text: text)
         item.decoration = decoration
@@ -364,6 +365,10 @@ struct BookScreen: View {
                                     if let decor = page.decoration, !decor.stickers.isEmpty {
                                         Label("シール \(decor.stickers.count)枚", systemImage: "sparkles").font(.caption)
                                     }
+                                    if let decor = page.decoration, !decor.photos.isEmpty {
+                                        Label("貼り付け画像 \(decor.photos.count)枚", systemImage: "photo.on.rectangle")
+                                            .font(.caption)
+                                    }
                                     HStack {
                                         if page.hearted { Image(systemName: "heart.fill") }
                                         if page.favorite { Image(systemName: "bookmark.fill") }
@@ -472,7 +477,8 @@ struct DiaryEditorScreen: View {
                         } else { failed = true }
                     }
                     .fontWeight(.semibold)
-                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && photo == nil)
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                              photo == nil && decoration.photos.isEmpty)
                 }
             }
             .onAppear {
@@ -587,7 +593,7 @@ struct SettingsScreen: View {
         Form {
             Section("アプリについて") {
                 LabeledContent("アプリ名", value: "まわる")
-                LabeledContent("バージョン", value: "0.3.0")
+                LabeledContent("バージョン", value: "0.4.0")
                 LabeledContent("データ保存", value: "このiPhone内")
             }
             Section("データ管理") {

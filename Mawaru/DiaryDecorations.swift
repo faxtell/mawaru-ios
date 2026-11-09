@@ -14,6 +14,21 @@ struct DiarySticker: Identifiable, Codable, Equatable {
 struct DiaryDecoration: Codable, Equatable {
     var paper: Int = 0
     var stickers: [DiarySticker] = []
+    var photos: [DiaryPastedPhoto] = []
+
+    // Older diary archives (v0.1–v0.3) contain no "photos" key.
+    init(paper: Int = 0, stickers: [DiarySticker] = [], photos: [DiaryPastedPhoto] = []) {
+        self.paper = paper
+        self.stickers = stickers
+        self.photos = photos
+    }
+    private enum CodingKeys: String, CodingKey { case paper, stickers, photos }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        paper = try values.decodeIfPresent(Int.self, forKey: .paper) ?? 0
+        stickers = try values.decodeIfPresent([DiarySticker].self, forKey: .stickers) ?? []
+        photos = try values.decodeIfPresent([DiaryPastedPhoto].self, forKey: .photos) ?? []
+    }
 
     mutating func addSticker(_ kind: String) {
         guard stickers.count < 24, DiaryStickerCatalog.items.contains(where: { $0.id == kind }) else { return }
@@ -33,7 +48,8 @@ struct DiaryDecoration: Codable, Equatable {
                     "scale": $0.scale,
                     "rotation": $0.rotation
                 ] as [String: Any]
-            }
+            },
+            "photos": photos.map { $0.cloudValue }
         ]
     }
 
@@ -57,7 +73,21 @@ struct DiaryDecoration: Codable, Equatable {
                 scale: min(2.5, max(0.5, scale)),
                 rotation: min(180, max(-180, rotation)))
         }
-        return DiaryDecoration(paper: validPaper, stickers: Array(elements))
+        let photos = (map["photos"] as? [[String: Any]] ?? []).prefix(4).compactMap {
+            raw -> DiaryPastedPhoto? in
+            guard let idText = raw["id"] as? String, let id = UUID(uuidString: idText),
+                  let format = raw["format"] as? String, ["jpg", "png"].contains(format),
+                  let x = raw["x"] as? Double, x.isFinite,
+                  let y = raw["y"] as? Double, y.isFinite,
+                  let scale = raw["scale"] as? Double, scale.isFinite,
+                  let rotation = raw["rotation"] as? Double, rotation.isFinite else { return nil }
+            return DiaryPastedPhoto(id: id, format: format,
+                                    x: min(0.93, max(0.07, x)),
+                                    y: min(0.9, max(0.1, y)),
+                                    scale: min(2.5, max(0.5, scale)),
+                                    rotation: min(180, max(-180, rotation)))
+        }
+        return DiaryDecoration(paper: validPaper, stickers: Array(elements), photos: Array(photos))
     }
 }
 
@@ -250,6 +280,7 @@ private struct DiaryMovableSticker: View {
 struct DiaryStickerBoard: View {
     @Binding var decoration: DiaryDecoration
     var editing = false
+    var cloudLocation: DiaryCloudPhotoLocation? = nil
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -277,6 +308,12 @@ struct DiaryStickerBoard: View {
                         decoration.stickers.removeAll { $0.id == sticker.id }
                     }
                 }
+                ForEach($decoration.photos) { $photo in
+                    DiaryPastedPhotoView(photo: $photo, canvasSize: geometry.size,
+                                         editing: editing, cloudLocation: cloudLocation) {
+                        decoration.photos.removeAll { $0.id == photo.id }
+                    }
+                }
             }
         }
         .frame(height: 254)
@@ -301,16 +338,18 @@ struct DiaryDecorationEditor: View {
             HStack {
                 Label("シールでデコろう", systemImage: "sparkles").font(.headline)
                 Spacer()
-                if !decoration.stickers.isEmpty {
+                if !decoration.stickers.isEmpty || !decoration.photos.isEmpty {
                     Menu {
                         Button("シールを全部剥がす", systemImage: "trash", role: .destructive) {
                             decoration.stickers.removeAll()
+                            decoration.photos.removeAll()
                         }
                     } label: { Image(systemName: "ellipsis.circle") }
                 }
             }
             DiaryStickerBoard(decoration: $decoration, editing: true)
-            Text("シールをタップして追加。ドラッグで移動、2本指で拡大・回転。長押しで剥がせるよ。")
+            DiaryPhotoInsertionControls(decoration: $decoration)
+            Text("シールや写真をタップして追加。ドラッグで移動、2本指で拡大・回転。長押しで剥がせるよ。")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             ScrollView(.horizontal, showsIndicators: false) {

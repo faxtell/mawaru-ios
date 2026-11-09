@@ -2,6 +2,7 @@
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue, Timestamp} = require("firebase-admin/firestore");
+const {getStorage} = require("firebase-admin/storage");
 const {randomBytes, createHash} = require("node:crypto");
 const {shortText, nextTurn, isValidRequestId, normalizedInvite, checkedDecoration} = require("./lib/logic");
 
@@ -106,10 +107,29 @@ exports.submitEntry = onCall(callableOptions, async (request) => {
   const requestId = request.data?.requestId;
   if (!isValidRequestId(requestId)) fail("invalid-argument", "投稿IDが無効です。");
   const title = checked(request.data?.title ?? "", 80, "タイトル", true);
-  const body = checked(request.data?.body, 5000, "本文");
   let decoration;
   try { decoration = checkedDecoration(request.data?.decoration); }
   catch { fail("invalid-argument", "シールやノートのデザインが無効です。"); }
+  const body = checked(request.data?.body ?? "", 5000, "本文", decoration.photos.length > 0);
+  // Validate every referenced photo in Cloud Storage, including its immutable
+  // path, content type, byte size, and owner, before writing the new page.
+  // Storage Rules protect object creation; the callable function protects
+  // which uploaded objects may appear in published diary pages.
+  for (const photo of decoration.photos) {
+    const path = `notebooks/${ref.id}/entry-assets/${requestId}/${uid}/${photo.id}.${photo.format}`;
+    let metadata;
+    try {
+      [metadata] = await getStorage().bucket().file(path).getMetadata();
+    } catch {
+      fail("failed-precondition", "画像をアップロードできませんでした。もう一度お試しください。");
+    }
+    const contentType = photo.format === "png" ? "image/png" : "image/jpeg";
+    if (metadata.contentType !== contentType ||
+        Number(metadata.size) > 1500000 ||
+        metadata.metadata?.ownerUid !== uid) {
+      fail("failed-precondition", "画像の所有者または形式を確認できません。");
+    }
+  }
   const entryRef = ref.collection("entries").doc(requestId);
   return db.runTransaction(async (tx) => {
     const bookSnap = await tx.get(ref);

@@ -304,7 +304,11 @@ struct SharedBookScreen: View {
                                 }.font(.caption).foregroundStyle(.secondary)
                                 Text(page.title.isEmpty ? "無題のページ" : page.title)
                                     .font(.system(.title3, design: .serif, weight: .bold))
-                                DiaryStickerBoard(decoration: .constant(page.decoration))
+                                DiaryStickerBoard(
+                                    decoration: .constant(page.decoration),
+                                    cloudLocation: DiaryCloudPhotoLocation(
+                                        bookID: bookID, entryID: page.id, authorID: page.authorID)
+                                )
                                 Text(page.body).font(.body)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
@@ -417,7 +421,7 @@ struct SharedEditorScreen: View {
                         .onChange(of: decoration) { _, _ in saveDraft() }
                     Text("送信するとページは参加メンバー全員に公開され、順番が次の人に移ります。")
                         .font(.footnote).foregroundStyle(.secondary)
-                    Text("写真のクラウド同期はまだ未対応です。")
+                    Text("写真・コピーした画像も最大4枚まで貼れて、共有すると相手にも表示されます。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 .padding(20)
@@ -445,7 +449,9 @@ struct SharedEditorScreen: View {
                             busy = false
                         }
                     }
-                    .disabled(busy || bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                    .disabled(busy ||
+                              (bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                               decoration.photos.isEmpty) ||
                               bodyText.count > 5000 || title.count > 80)
                 }
             }
