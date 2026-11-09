@@ -45,18 +45,18 @@ struct ExchangeHomeScreen: View {
                         .font(.system(.headline, design: .rounded, weight: .bold))
                     Text("ページを書いて、シールで飾って、次の人へ。近くの人は会って通信できたときに、遠くの人はオンラインでバトンが進むよ。")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(MawaruContrast.secondaryInk)
                 }
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 20))
+                .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 20))
                 NavigationLink {
                     HomeScreen()
                 } label: {
                     Label("ひとりで試す・これまでの端末内日記", systemImage: "book.closed")
                         .font(.footnote)
                 }
-                .foregroundStyle(.secondary)
+                .foregroundStyle(MawaruContrast.secondaryInk)
                 .padding(.bottom, 10)
             }
             .padding(20)
@@ -151,15 +151,30 @@ struct NearbyConnectionPanel: View {
                     .background(MawaruPastel.mint, in: Capsule())
             }
             if transport.connected.isEmpty && transport.discovered.isEmpty {
-                Text("相手も「まわる」の近くの人モードを開いてね。見つかったら「接続する」を押そう。")
-                    .font(.footnote).foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "iphone.radiowaves.left.and.right")
+                        .font(.title3)
+                        .foregroundStyle(MawaruContrast.ink)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("まだ接続されていません")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(MawaruContrast.ink)
+                        Text("相手も「まわる」の「近くの人」を開いてね。見つかったら「接続する」をタップ。")
+                            .font(.footnote)
+                            .foregroundStyle(MawaruContrast.secondaryInk)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(13)
+                .background(MawaruPastel.mint.opacity(0.45),
+                            in: RoundedRectangle(cornerRadius: 14))
             }
             ForEach(transport.connected, id: \.displayName) { peer in
                 HStack {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                     Text(peer.displayName).font(.subheadline.weight(.medium))
                     Spacer()
-                    Text("接続中").font(.caption).foregroundStyle(.secondary)
+                    Text("接続中").font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                 }
             }
             ForEach(transport.discovered.filter { !transport.connected.contains($0) },
@@ -175,10 +190,15 @@ struct NearbyConnectionPanel: View {
                 }
             }
             Text("接続にはBluetooth・ローカルネットワークの許可が必要です。相手が承認して初めて交換できます。")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(MawaruContrast.secondaryInk)
         }
-        .padding(16)
-        .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 20))
+        .padding(18)
+        .foregroundStyle(MawaruContrast.ink)
+        .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 22))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(MawaruContrast.border.opacity(0.50), lineWidth: 1)
+        }
         .alert("近くの人から接続リクエスト", isPresented: Binding(
             get: { transport.incomingInvitationPeer != nil },
             set: { if !$0 { transport.respondToInvitation(accept: false) } }
@@ -214,7 +234,7 @@ struct NearbyHomeScreen: View {
                     Text("近くでまわす日記帳")
                         .font(.system(.title3, design: .rounded, weight: .bold))
                     Spacer()
-                    Text("\(nearby.books.count)冊").font(.caption).foregroundStyle(.secondary)
+                    Text("\(nearby.books.count)冊").font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                 }
                 if nearby.books.isEmpty {
                     ContentUnavailableView("まだ日記帳がないよ", systemImage: "book.closed",
@@ -232,15 +252,15 @@ struct NearbyHomeScreen: View {
                                 Text(!book.isPaired ? "相手の参加待ち" :
                                     book.isMyTurn(nearby.deviceID) ? "あなたの番 ♡" :
                                     "\(book.currentWriter)の番")
-                                    .font(.subheadline).foregroundStyle(.secondary)
+                                    .font(.subheadline).foregroundStyle(MawaruContrast.secondaryInk)
                                 Text("\(nearby.pages(in: book.id).count)ページ・近距離")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                             }
                             Spacer()
-                            Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right").foregroundStyle(MawaruContrast.secondaryInk)
                         }
                         .padding(14)
-                        .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 22))
+                        .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 22))
                     }
                     .buttonStyle(.plain)
                 }
@@ -251,11 +271,13 @@ struct NearbyHomeScreen: View {
                 .buttonStyle(.borderedProminent)
                 .tint(DiaryStyle.ink)
                 Text("日記の本文・シール・切り抜き写真は接続した端末へ直接送られます。インターネットへアップロードしません。")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
             }
             .padding(20)
+            .padding(.bottom, 88)
+            .foregroundStyle(MawaruContrast.ink)
         }
-        .background(DiaryStyle.background.opacity(0.55))
+        .background(DiaryStyle.background)
         .navigationTitle("近くの人")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $creating) { NearbyCreateScreen() }
@@ -306,7 +328,7 @@ struct NearbyCreateScreen: View {
                 Section("日記帳のグループ名") {
                     TextField("例：放課後のひみつノート", text: $title)
                     Text("この名前が表紙とすべてのページの上に表示されるよ。")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                 }
                 Section("ふたりの名前") {
                     TextField("あなたのニックネーム", text: $myName)
@@ -322,7 +344,7 @@ struct NearbyCreateScreen: View {
                                     .overlay {
                                         if cover == index {
                                             Image(systemName: "checkmark.circle.fill")
-                                                .foregroundStyle(.white)
+                                                .foregroundStyle(MawaruContrast.ink)
                                         }
                                     }
                             }.buttonStyle(.plain)
@@ -331,7 +353,7 @@ struct NearbyCreateScreen: View {
                 }
                 Section {
                     Text("近くの人モードは2人用。相手と接続して日記帳を送ると、同じノートが相手のiPhoneにも作られます。")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
                 }
             }
             .navigationTitle("日記帳を作る")
@@ -379,9 +401,11 @@ struct NearbyBookScreen: View {
                     pagesSection(book)
                 }
                 .padding(18)
+                .padding(.bottom, 88) // Keep the final card clear of iOS's floating tab bar.
+                .foregroundStyle(MawaruContrast.ink)
             }
         }
-        .background(DiaryStyle.background.opacity(0.55))
+        .background(DiaryStyle.background)
         .navigationTitle(book?.title ?? "近くの日記帳")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $editing) { NearbyEditorScreen(bookID: bookID) }
@@ -404,7 +428,7 @@ struct NearbyBookScreen: View {
                 Text(book.title)
                     .font(.system(.title2, design: .rounded, weight: .bold))
                 Text(book.isPaired ? "ふたりのノート ♡" : "相手とまだつながっていません")
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(MawaruContrast.secondaryInk)
                 Text("NO. \(nearby.pages(in: bookID).count + 1)  ·  近くで交換")
                     .font(.caption).foregroundStyle(DiaryStyle.ink)
             }
@@ -414,7 +438,9 @@ struct NearbyBookScreen: View {
 
     private func turnOrder(_ book: NearbyBook) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("バトンの順番").font(.headline)
+            Label("バトンの順番", systemImage: "heart.circle")
+                .font(.system(.headline, design: .rounded, weight: .bold))
+                .foregroundStyle(MawaruContrast.ink)
             ForEach(book.members.indices, id: \.self) { index in
                 HStack {
                     Image(systemName: index == book.currentTurn ?
@@ -422,18 +448,28 @@ struct NearbyBookScreen: View {
                         .foregroundStyle(DiaryStyle.ink)
                     Text(book.members[index].name)
                     if book.members[index].id == nearby.deviceID {
-                        Text("あなた").font(.caption).foregroundStyle(.secondary)
+                        Text("あなた").font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                     }
                     Spacer()
                     if index == book.currentTurn {
                         Text("次に書く人")
-                            .font(.caption).foregroundStyle(DiaryStyle.ink)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(MawaruContrast.ink)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(MawaruPastel.rose.opacity(0.55),
+                                        in: Capsule())
                     }
                 }
             }
         }
-        .padding(16)
-        .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 20))
+        .padding(18)
+        .foregroundStyle(MawaruContrast.ink)
+        .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 22))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(MawaruContrast.border.opacity(0.5), lineWidth: 1)
+        }
     }
 
     @ViewBuilder
@@ -444,7 +480,7 @@ struct NearbyBookScreen: View {
                       systemImage: "hourglass.circle")
                     .font(.headline)
                 Text("相手が承認するとバトンが進むよ。通信が切れた場合は、同じ端末へ再送してね。")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
                 NearbyPeerActionMenu(
                     transport: nearby.transport,
                     label: "受け渡しを再送",
@@ -454,11 +490,12 @@ struct NearbyBookScreen: View {
                     catch { self.error = error.localizedDescription }
                 }
                 Text("宛先：\(waiting.targetPeerName)")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(MawaruContrast.secondaryInk)
             }
-            .padding(16)
-            .background(MawaruPastel.lemon.opacity(0.40),
-                        in: RoundedRectangle(cornerRadius: 20))
+            .padding(18)
+            .foregroundStyle(MawaruContrast.ink)
+            .background(MawaruPastel.lemon.opacity(0.63),
+                        in: RoundedRectangle(cornerRadius: 22))
         } else if !book.isPaired {
             VStack(alignment: .leading, spacing: 10) {
                 Text("① 相手のiPhoneと接続する")
@@ -474,9 +511,14 @@ struct NearbyBookScreen: View {
                     catch { self.error = error.localizedDescription }
                 }
             }
-            .padding(16)
-            .background(MawaruPastel.mint.opacity(0.48),
-                        in: RoundedRectangle(cornerRadius: 20))
+            .padding(18)
+            .foregroundStyle(MawaruContrast.ink)
+            .background(MawaruPastel.mint.opacity(0.63),
+                        in: RoundedRectangle(cornerRadius: 22))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22)
+                    .strokeBorder(MawaruContrast.ink.opacity(0.10), lineWidth: 1)
+            }
         } else if book.isMyTurn(nearby.deviceID) {
             Button { editing = true } label: {
                 Label("ページを書いて、会ったときに渡す ♡", systemImage: "pencil.line")
@@ -500,7 +542,7 @@ struct NearbyBookScreen: View {
                     .font(.system(.title3, design: .rounded, weight: .bold))
                 Spacer()
                 Text("\(nearby.pages(in: bookID).count)ページ")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
             }
             if nearby.pages(in: bookID).isEmpty {
                 ContentUnavailableView("まだ白紙のノート", systemImage: "book.closed",
@@ -646,7 +688,7 @@ struct NearbyEditorScreen: View {
             .foregroundStyle(bodyText.count > 5000 || title.count > 80 ?
                              Color.red : Color.secondary)
             Text("送るまでは自分のiPhoneに下書きを保存。会えたときにバトンを渡せるよ。")
-                .font(.footnote).foregroundStyle(.secondary)
+                .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
         }
     }
 
@@ -654,7 +696,7 @@ struct NearbyEditorScreen: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("会えたときに渡せる下書き ♡")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                 Spacer()
                 Button {
                     preview.toggle()

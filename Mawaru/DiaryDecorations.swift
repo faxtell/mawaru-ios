@@ -220,7 +220,7 @@ private struct DiaryStickerShape: View {
                             Text(item.visual).font(.system(size: 10, weight: .black, design: .rounded))
                             Image(systemName: "heart.fill").font(.system(size: 9))
                         }
-                        .foregroundStyle(.white.opacity(0.94))
+                        .foregroundStyle(MawaruContrast.ink)
                     }
             } else {
                 Text(item.visual)
@@ -414,7 +414,7 @@ struct DiaryDecorationEditor: View {
             }
             DiaryPhotoInsertionControls(decoration: $decoration)
             Text("上のノートに、文字を隠すようにペタッ。写真もシールもドラッグ・拡大・回転できるよ ♡")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 9) {
@@ -429,7 +429,7 @@ struct DiaryDecorationEditor: View {
                                 Text(sticker.name).font(.system(size: 10)).lineLimit(1)
                             }
                             .frame(width: 76, height: 76)
-                            .background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 13))
+                            .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 13))
                         }
                         .buttonStyle(.plain)
                         .disabled(decoration.stickers.count >= 24)
@@ -443,7 +443,7 @@ struct DiaryDecorationEditor: View {
                 Text("貼り付け画像 \(decoration.photos.count)/4枚")
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MawaruContrast.secondaryInk)
             Text("ノートの紙").font(.subheadline.bold())
             HStack(spacing: 8) {
                 ForEach(0..<4, id: \.self) { index in
@@ -461,7 +461,7 @@ struct DiaryDecorationEditor: View {
                                 }
                             Text(paperNames[index])
                                 .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(MawaruContrast.secondaryInk)
                         }
                     }.buttonStyle(.plain)
                 }

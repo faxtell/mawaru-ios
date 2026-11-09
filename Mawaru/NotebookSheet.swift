@@ -5,13 +5,25 @@ import UniformTypeIdentifiers
 // Notebook composition shared by draft, local archive and cloud pages.
 // The paper measures its real content height; stickers are overlaid at
 // normalized positions and therefore can sit over text or in the margins.
+// High-contrast text tokens on pastel and white surfaces.
+// Keep text colors explicit: automatic .primary becomes white in Dark Mode,
+// whereas the notebook cards intentionally use light paper backgrounds.
+enum MawaruContrast {
+    static let ink = Color(red: 0.23, green: 0.18, blue: 0.25)
+    static let secondaryInk = Color(red: 0.38, green: 0.31, blue: 0.40)
+    static let mutedInk = Color(red: 0.43, green: 0.37, blue: 0.46)
+    static let surface = Color(red: 1.00, green: 0.995, blue: 0.997)
+    static let background = Color(red: 0.995, green: 0.950, blue: 0.963)
+    static let border = Color(red: 0.76, green: 0.70, blue: 0.76)
+}
+
 enum MawaruPastel {
     static let background = Color(red: 0.995, green: 0.945, blue: 0.952)
     static let rose = Color(red: 0.98, green: 0.75, blue: 0.80)
     static let mint = Color(red: 0.76, green: 0.91, blue: 0.83)
     static let lavender = Color(red: 0.85, green: 0.81, blue: 0.95)
     static let lemon = Color(red: 1.0, green: 0.92, blue: 0.72)
-    static let ink = Color(red: 0.38, green: 0.31, blue: 0.36)
+    static let ink = MawaruContrast.ink
 }
 
 struct MawaruSectionLabel: View {

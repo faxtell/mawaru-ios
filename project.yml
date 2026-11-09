@@ -32,6 +32,7 @@ targets:
         NSBonjourServices:
           - '_mawaru-diary._tcp'
         UILaunchScreen: {}
+        UIUserInterfaceStyle: Light
     dependencies:
       - package: Firebase
         product: FirebaseCore
@@ -50,8 +51,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: 'まわる'
         INFOPLIST_KEY_UILaunchScreen_Generation: 'YES'
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: '交換日記に写真を添付するために写真を選択します。'
-        MARKETING_VERSION: 0.8.0
-        CURRENT_PROJECT_VERSION: 8
+        MARKETING_VERSION: 0.8.1
+        CURRENT_PROJECT_VERSION: 9
         GENERATE_INFOPLIST_FILE: NO
         SUPPORTS_MACCATALYST: NO
     scheme:

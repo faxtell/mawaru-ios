@@ -211,18 +211,18 @@ struct HomeScreen: View {
                         HStack(spacing: 18) {
                             BookCover(book: book, small: true)
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(book.title).font(.headline).foregroundStyle(.primary)
+                                Text(book.title).font(.headline).foregroundStyle(MawaruContrast.ink)
                                 Text(book.paused ? "おやすみ中" : (book.isMyTurn ? "あなたの番です ✨" : "\(book.currentWriter)の番です"))
                                     .font(.subheadline)
                                     .foregroundStyle(book.isMyTurn ? DiaryStyle.ink : .secondary)
                                 Text("\(store.pages(of: book.id).count)ページ・\(book.members.count)人")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                             }
                             Spacer(minLength: 0)
-                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                         }
                         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 23))
+                        .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 23))
                     }.buttonStyle(.plain)
                 }
                 Button { creating = true } label: {
@@ -230,7 +230,7 @@ struct HomeScreen: View {
                         .font(.headline).frame(maxWidth: .infinity).padding(14)
                 }.buttonStyle(.borderedProminent).tint(DiaryStyle.ink)
                 Text("ここは従来の端末内おためし日記です。実際に別のiPhoneと交換するときは「交換する」タブから近く・遠くのモードを選んでね。")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
             }.padding(20)
         }
         .background(DiaryStyle.background.opacity(0.55))
@@ -257,7 +257,7 @@ struct CreateBookScreen: View {
                             Button { cover = i } label: {
                                 RoundedRectangle(cornerRadius: 10).fill(DiaryStyle.colors[i])
                                     .frame(height: 58)
-                                    .overlay { if cover == i { Image(systemName: "checkmark.circle.fill").foregroundStyle(.white) } }
+                                    .overlay { if cover == i { Image(systemName: "checkmark.circle.fill").foregroundStyle(MawaruContrast.ink) } }
                             }.buttonStyle(.plain)
                         }
                     }.padding(.vertical, 8)
@@ -278,7 +278,7 @@ struct CreateBookScreen: View {
                 }
                 Section {
                     Text("この日記帳は端末内で交換を試すモードです。実際の招待は「共有」タブから行えます。")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
                 }
             }
             .navigationTitle("新しい日記帳")
@@ -312,7 +312,7 @@ struct BookScreen: View {
                         VStack(alignment: .leading, spacing: 7) {
                             Text(book.title).font(.title2.bold())
                             Text("\(book.members.count)人でつづる交換日記")
-                                .font(.subheadline).foregroundStyle(.secondary)
+                                .font(.subheadline).foregroundStyle(MawaruContrast.secondaryInk)
                             Text(book.paused ? "おやすみ中" : (book.isMyTurn ? "あなたの番です" : "\(book.currentWriter)の番です"))
                                 .font(.headline).foregroundStyle(DiaryStyle.ink)
                         }
@@ -342,7 +342,7 @@ struct BookScreen: View {
                             Label("操作する人：\(book.members[book.activeMemberIndex])（デモ）", systemImage: "person.crop.circle")
                                 .font(.footnote)
                         }
-                    }.padding(16).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    }.padding(16).background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 18))
                     if book.isMyTurn {
                         Button { editing = true } label: {
                             Label("日記を書いて、次の人へ渡す", systemImage: "pencil.line")
@@ -351,13 +351,13 @@ struct BookScreen: View {
                     } else {
                         Label(book.paused ? "この日記帳はおやすみ中です" : "\(book.currentWriter)が書くのを待っています",
                               systemImage: "hourglass")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(MawaruContrast.secondaryInk)
                     }
                     HStack {
                         Text("ページをめくろう").font(.title3.bold())
                         Spacer()
                         Text("\(store.pages(of: bookID).count)ページ")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(MawaruContrast.secondaryInk)
                     }
                     if store.pages(of: bookID).isEmpty {
                         ContentUnavailableView("まだ白紙の一冊", systemImage: "text.book.closed",
@@ -370,7 +370,7 @@ struct BookScreen: View {
                                         Text(page.author).font(.caption)
                                         Spacer()
                                         Text(page.date, style: .date).font(.caption)
-                                    }.foregroundStyle(.secondary)
+                                    }.foregroundStyle(MawaruContrast.secondaryInk)
                                     Text(page.title.isEmpty ? "無題のページ" : page.title)
                                         .font(.system(.title3, design: .serif, weight: .semibold))
                                     Text(page.text).font(.body).lineLimit(3)
@@ -387,10 +387,10 @@ struct BookScreen: View {
                                         if page.favorite { Image(systemName: "bookmark.fill") }
                                         Spacer()
                                         Image(systemName: "chevron.right")
-                                    }.font(.caption).foregroundStyle(.secondary)
+                                    }.font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                                 }
-                                .foregroundStyle(.primary).padding(18)
-                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 17))
+                                .foregroundStyle(MawaruContrast.ink).padding(18)
+                                .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 19))
                             }.buttonStyle(.plain)
                         }
                     }
@@ -516,7 +516,7 @@ struct DiaryEditorScreen: View {
                     .font(.caption)
                     .foregroundStyle(text.count > 5000 || title.count > 80 ? Color.red : Color.secondary)
                     Text("シールは文字の上にも貼れるよ。完成したらバトンを渡そう ♡")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
                 }.padding(18)
             }
             .background(DiaryStyle.background.opacity(0.55))
@@ -644,9 +644,9 @@ struct MemoriesScreen: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(page.title.isEmpty ? "無題のページ" : page.title).font(.headline)
-                        Text(page.text).lineLimit(2).font(.subheadline).foregroundStyle(.secondary)
+                        Text(page.text).lineLimit(2).font(.subheadline).foregroundStyle(MawaruContrast.secondaryInk)
                         Text("\(page.author)・\(page.date.formatted(date: .abbreviated, time: .omitted))")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                     }.padding(.vertical, 5)
                 }
             }
@@ -691,7 +691,7 @@ struct SettingsScreen: View {
                     Text("いつもの文字を選ぼう ♡")
                         .font(.system(.title3, design: .rounded, weight: .bold))
                     Text("ここで選んだフォント・大きさ・色は、これから書く日記に自動で使われます。毎回選び直す必要はないよ。")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
                     Picker("いつものノート用紙", selection: $defaultPaper) {
                         Text("クリーム").tag(0)
                         Text("さくら").tag(1)
@@ -709,7 +709,7 @@ struct SettingsScreen: View {
                         .background(MawaruPastel.lemon.opacity(0.28),
                                     in: RoundedRectangle(cornerRadius: 14))
                     Text("過去の日記や保存中の下書きの文字設定は変わりません。日記を書いている途中でも、そのページだけ変更できます。")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                 }
                 .padding(.vertical, 6)
             } header: {
@@ -730,7 +730,7 @@ struct SettingsScreen: View {
             }
             Section {
                 Text("ローカル日記の画像はこのiPhone内に保存されます。共有日記はFirebaseを設定した場合のみ使えます。エクスポートには画像本体を含みません。")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
             }
         }
         .scrollContentBackground(.hidden)

@@ -80,7 +80,7 @@ struct DiaryTypographyControls: View {
 
             Text("フォント")
                 .font(.caption.bold())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(MawaruContrast.secondaryInk)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 9) {
                     ForEach(DiaryFonts.names.indices, id: \.self) { index in
@@ -157,7 +157,7 @@ struct DiaryTypographyControls: View {
                 decoration.textAlignment = stored.textAlignment
             }
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(MawaruContrast.secondaryInk)
         }
         .padding(16)
         .background(MawaruPastel.lavender.opacity(0.27),

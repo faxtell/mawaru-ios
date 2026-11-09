@@ -30,7 +30,7 @@ struct DiaryWritingPromptPicker: View {
             .buttonStyle(.plain)
             if expanded {
                 Text("気になったお題を選ぶと本文に追加されるよ。")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                 ForEach(prompts, id: \.self) { prompt in
                     Button {
                         let separator = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -46,7 +46,7 @@ struct DiaryWritingPromptPicker: View {
                         .font(.subheadline)
                         .foregroundStyle(MawaruPastel.ink)
                         .padding(10)
-                        .background(.white.opacity(0.78),
+                        .background(MawaruContrast.surface,
                                     in: RoundedRectangle(cornerRadius: 11))
                     }
                     .buttonStyle(.plain)
