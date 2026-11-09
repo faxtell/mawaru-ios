@@ -572,7 +572,7 @@ struct SharedRenameScreen: View {
                             do {
                                 try await shared.renameBook(bookID: bookID, title: title)
                                 dismiss()
-                            } catch { error = error.localizedDescription }
+                            } catch { self.error = error.localizedDescription }
                             busy = false
                         }
                     }

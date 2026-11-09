@@ -345,7 +345,7 @@ struct NearbyCreateScreen: View {
                             try nearby.create(title: title, myName: myName,
                                               otherName: otherName, cover: cover)
                             dismiss()
-                        } catch { error = error.localizedDescription }
+                        } catch { self.error = error.localizedDescription }
                     }
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                               myName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
@@ -372,116 +372,11 @@ struct NearbyBookScreen: View {
         ScrollView {
             if let book {
                 VStack(alignment: .leading, spacing: 18) {
-                    HStack(spacing: 16) {
-                        NearbyBookCover(book: book)
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(book.title)
-                                .font(.system(.title2, design: .rounded, weight: .bold))
-                            Text(book.isPaired ? "ふたりのノート ♡" : "相手とまだつながっていません")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                            Text("NO. \(nearby.pages(in: bookID).count + 1)  ·  近くで交換")
-                                .font(.caption).foregroundStyle(DiaryStyle.ink)
-                        }
-                        Spacer(minLength: 0)
-                    }
+                    bookHeader(book)
                     NearbyConnectionPanel(transport: nearby.transport)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("バトンの順番")
-                            .font(.headline)
-                        ForEach(book.members.indices, id: \.self) { index in
-                            HStack {
-                                Image(systemName: index == book.currentTurn ?
-                                      "heart.circle.fill" : "circle")
-                                    .foregroundStyle(DiaryStyle.ink)
-                                Text(book.members[index].name)
-                                if book.members[index].id == nearby.deviceID {
-                                    Text("あなた").font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if index == book.currentTurn {
-                                    Text("次に書く人")
-                                        .font(.caption)
-                                        .foregroundStyle(DiaryStyle.ink)
-                                }
-                            }
-                        }
-                    }
-                    .padding(16)
-                    .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 20))
-
-                    if let waiting = nearby.pendingTransfer(for: bookID) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Label("相手の受け取り確認を待っています",
-                                  systemImage: "hourglass.circle")
-                                .font(.headline)
-                            Text("相手が承認するとバトンが進むよ。通信が切れた場合は、同じ端末へ再送してね。")
-                                .font(.footnote).foregroundStyle(.secondary)
-                            NearbyPeerActionMenu(
-                                transport: nearby.transport,
-                                label: "受け渡しを再送",
-                                symbol: "arrow.clockwise"
-                            ) { peer in
-                                do { try nearby.retry(bookID: bookID, to: peer) }
-                                catch { error = error.localizedDescription }
-                            }
-                            Text("宛先：\(waiting.targetPeerName)")
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                        .padding(16)
-                        .background(MawaruPastel.lemon.opacity(0.40),
-                                    in: RoundedRectangle(cornerRadius: 20))
-                    } else if !book.isPaired {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("① 相手のiPhoneと接続する")
-                                .font(.subheadline.weight(.semibold))
-                            Text("② この日記帳を相手へ送る")
-                                .font(.subheadline.weight(.semibold))
-                            NearbyPeerActionMenu(
-                                transport: nearby.transport,
-                                label: "相手を日記帳に招待",
-                                symbol: "person.crop.circle.badge.plus"
-                            ) { peer in
-                                do { try nearby.sendPair(bookID: bookID, to: peer) }
-                                catch { error = error.localizedDescription }
-                            }
-                        }
-                        .padding(16)
-                        .background(MawaruPastel.mint.opacity(0.48),
-                                    in: RoundedRectangle(cornerRadius: 20))
-                    } else if book.isMyTurn(nearby.deviceID) {
-                        Button { editing = true } label: {
-                            Label("ページを書いて、会ったときに渡す ♡", systemImage: "pencil.line")
-                                .frame(maxWidth: .infinity).padding(14)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(DiaryStyle.ink)
-                    } else {
-                        Label("\(book.currentWriter)が書く番だよ。次に会ったときに受け取ろう ♡",
-                              systemImage: "heart")
-                            .font(.subheadline)
-                            .foregroundStyle(DiaryStyle.ink)
-                            .padding(14)
-                    }
-
-                    HStack {
-                        Text("ページをめくろう")
-                            .font(.system(.title3, design: .rounded, weight: .bold))
-                        Spacer()
-                        Text("\(nearby.pages(in: bookID).count)ページ")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    if nearby.pages(in: bookID).isEmpty {
-                        ContentUnavailableView("まだ白紙のノート", systemImage: "book.closed",
-                            description: Text("最初の1ページが待っているよ。"))
-                    }
-                    ForEach(nearby.pages(in: bookID)) { page in
-                        NostalgicNotebookReadPage(
-                            title: page.title, text: page.body, author: page.author,
-                            date: page.createdAt, decoration: page.decoration,
-                            bookTitle: book.title, pageNumber: max(1, page.sequence - 1),
-                            exchangeMode: "近くで交換"
-                        )
-                    }
+                    turnOrder(book)
+                    handoffControls(book)
+                    pagesSection(book)
                 }
                 .padding(18)
             }
@@ -489,16 +384,137 @@ struct NearbyBookScreen: View {
         .background(DiaryStyle.background.opacity(0.55))
         .navigationTitle(book?.title ?? "近くの日記帳")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $editing) {
-            NearbyEditorScreen(bookID: bookID)
-        }
+        .sheet(isPresented: $editing) { NearbyEditorScreen(bookID: bookID) }
         .onAppear { nearby.transport.start() }
         .onDisappear { nearby.transport.stop() }
         .modifier(NearbyInboxAlerts())
         .alert("操作できませんでした", isPresented: Binding(
             get: { error != nil }, set: { if !$0 { error = nil } }
-        )) { Button("OK") { error = nil } }
-        message: { Text(error ?? "") }
+        )) {
+            Button("OK") { error = nil }
+        } message: {
+            Text(error ?? "")
+        }
+    }
+
+    private func bookHeader(_ book: NearbyBook) -> some View {
+        HStack(spacing: 16) {
+            NearbyBookCover(book: book)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(book.title)
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                Text(book.isPaired ? "ふたりのノート ♡" : "相手とまだつながっていません")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Text("NO. \(nearby.pages(in: bookID).count + 1)  ·  近くで交換")
+                    .font(.caption).foregroundStyle(DiaryStyle.ink)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func turnOrder(_ book: NearbyBook) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("バトンの順番").font(.headline)
+            ForEach(book.members.indices, id: \.self) { index in
+                HStack {
+                    Image(systemName: index == book.currentTurn ?
+                          "heart.circle.fill" : "circle")
+                        .foregroundStyle(DiaryStyle.ink)
+                    Text(book.members[index].name)
+                    if book.members[index].id == nearby.deviceID {
+                        Text("あなた").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if index == book.currentTurn {
+                        Text("次に書く人")
+                            .font(.caption).foregroundStyle(DiaryStyle.ink)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    @ViewBuilder
+    private func handoffControls(_ book: NearbyBook) -> some View {
+        if let waiting = nearby.pendingTransfer(for: bookID) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("相手の受け取り確認を待っています",
+                      systemImage: "hourglass.circle")
+                    .font(.headline)
+                Text("相手が承認するとバトンが進むよ。通信が切れた場合は、同じ端末へ再送してね。")
+                    .font(.footnote).foregroundStyle(.secondary)
+                NearbyPeerActionMenu(
+                    transport: nearby.transport,
+                    label: "受け渡しを再送",
+                    symbol: "arrow.clockwise"
+                ) { peer in
+                    do { try nearby.retry(bookID: bookID, to: peer) }
+                    catch { self.error = error.localizedDescription }
+                }
+                Text("宛先：\(waiting.targetPeerName)")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .background(MawaruPastel.lemon.opacity(0.40),
+                        in: RoundedRectangle(cornerRadius: 20))
+        } else if !book.isPaired {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("① 相手のiPhoneと接続する")
+                    .font(.subheadline.weight(.semibold))
+                Text("② この日記帳を相手へ送る")
+                    .font(.subheadline.weight(.semibold))
+                NearbyPeerActionMenu(
+                    transport: nearby.transport,
+                    label: "相手を日記帳に招待",
+                    symbol: "person.crop.circle.badge.plus"
+                ) { peer in
+                    do { try nearby.sendPair(bookID: bookID, to: peer) }
+                    catch { self.error = error.localizedDescription }
+                }
+            }
+            .padding(16)
+            .background(MawaruPastel.mint.opacity(0.48),
+                        in: RoundedRectangle(cornerRadius: 20))
+        } else if book.isMyTurn(nearby.deviceID) {
+            Button { editing = true } label: {
+                Label("ページを書いて、会ったときに渡す ♡", systemImage: "pencil.line")
+                    .frame(maxWidth: .infinity).padding(14)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(DiaryStyle.ink)
+        } else {
+            Label("\(book.currentWriter)が書く番だよ。次に会ったときに受け取ろう ♡",
+                  systemImage: "heart")
+                .font(.subheadline)
+                .foregroundStyle(DiaryStyle.ink)
+                .padding(14)
+        }
+    }
+
+    private func pagesSection(_ book: NearbyBook) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("ページをめくろう")
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                Spacer()
+                Text("\(nearby.pages(in: bookID).count)ページ")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if nearby.pages(in: bookID).isEmpty {
+                ContentUnavailableView("まだ白紙のノート", systemImage: "book.closed",
+                    description: Text("最初の1ページが待っているよ。"))
+            }
+            ForEach(nearby.pages(in: bookID)) { page in
+                NostalgicNotebookReadPage(
+                    title: page.title, text: page.body, author: page.author,
+                    date: page.createdAt, decoration: page.decoration,
+                    bookTitle: book.title, pageNumber: max(1, page.sequence - 1),
+                    exchangeMode: "近くで交換"
+                )
+            }
+        }
     }
 }
 
@@ -544,6 +560,17 @@ struct NearbyEditorScreen: View {
 
     private var book: NearbyBook? { nearby.book(bookID) }
     private var draftKey: String { "mawaru.nearby.draft.\(bookID.uuidString)" }
+    private var pageNumber: Int { nearby.pages(in: bookID).count + 1 }
+    private var groupName: String { book?.title ?? "交換日記" }
+    private var authorName: String { book?.currentWriter ?? "わたし" }
+    private var cannotSend: Bool {
+        nearby.transport.connected.isEmpty ||
+        nearby.pendingTransfer(for: bookID) != nil ||
+        (bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+         decoration.photos.isEmpty) ||
+        bodyText.count > 5000 || title.count > 80
+    }
+
     private struct Draft: Codable {
         var title: String
         var body: String
@@ -561,137 +588,152 @@ struct NearbyEditorScreen: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 15) {
-                    MawaruSectionLabel(step: "01", title: "きょうのノート", symbol: "pencil.and.scribble")
-                    HStack {
-                        Text("会えたときに渡せる下書き ♡")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Button {
-                            preview.toggle()
-                            saveDraft()
-                        } label: {
-                            Label(preview ? "編集へ" : "完成プレビュー",
-                                  systemImage: preview ? "pencil" : "eye")
-                        }
-                        .buttonStyle(.bordered)
+            ScrollView { editorContent.padding(18) }
+                .background(DiaryStyle.background.opacity(0.55))
+                .navigationTitle(groupName)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("閉じる") { saveDraft(); dismiss() }
                     }
-                    if preview {
-                        NostalgicNotebookReadPage(
-                            title: title, text: bodyText,
-                            author: book?.currentWriter ?? "わたし",
-                            date: .now, decoration: decoration,
-                            bookTitle: book?.title ?? "交換日記",
-                            pageNumber: nearby.pages(in: bookID).count + 1,
-                            exchangeMode: "近くで交換"
-                        )
-                    } else {
-                        NostalgicNotebookEditor(
-                            title: $title, text: $bodyText, decoration: $decoration,
-                            author: book?.currentWriter ?? "わたし",
-                            bookTitle: book?.title ?? "交換日記",
-                            pageNumber: nearby.pages(in: bookID).count + 1,
-                            exchangeMode: "近くで交換"
-                        )
+                    ToolbarItem(placement: .confirmationAction) {
+                        sendMenu
                     }
-                    DisclosureGroup(isExpanded: $showTextTools) {
-                        DiaryTypographyControls(
-                            decoration: $decoration, resetToSavedPreference: true
-                        )
-                        .padding(.top, 8)
-                    } label: {
-                        MawaruSectionLabel(step: "02", title: "このページだけ文字を変更",
-                                           symbol: "textformat")
-                    }
-                    .tint(DiaryStyle.ink)
-                    DiaryWritingPromptPicker(text: $bodyText)
-                    MawaruSectionLabel(step: "03", title: "シールや写真でデコろう",
-                                       symbol: "sparkles")
-                    DiaryDecorationEditor(decoration: $decoration, showsPreview: false)
-                    HStack {
-                        Text("本文 \(bodyText.count)/5000文字")
-                        Spacer()
-                        Text("タイトル \(title.count)/80文字")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(bodyText.count > 5000 || title.count > 80 ?
-                                     Color.red : Color.secondary)
-                    Text("送るまでは自分のiPhoneに下書きを保存。会えたときにバトンを渡せるよ。")
-                        .font(.footnote).foregroundStyle(.secondary)
                 }
-                .padding(18)
+                .onAppear(perform: loadDraft)
+                .onChange(of: title) { _, _ in saveDraft() }
+                .onChange(of: bodyText) { _, _ in saveDraft() }
+                .onChange(of: decoration) { _, _ in saveDraft() }
+                .onChange(of: nearby.lastCompletedTransfer) { _, next in
+                    if next != nil && next == outgoingID {
+                        UserDefaults.standard.removeObject(forKey: draftKey)
+                        dismiss()
+                    }
+                }
+                .confirmationDialog("このページを近くの相手に渡す？",
+                                    isPresented: $confirmSend) {
+                    Button("バトンを渡す ♡") {
+                        if let peer = targetPeer { send(to: peer) }
+                    }
+                } message: {
+                    Text("相手が受け取りを承認すると、次の人の番になります。")
+                }
+                .alert("送信できませんでした", isPresented: Binding(
+                    get: { error != nil }, set: { if !$0 { error = nil } }
+                )) {
+                    Button("OK") { error = nil }
+                } message: {
+                    Text(error ?? "")
+                }
+        }
+    }
+
+    private var editorContent: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            MawaruSectionLabel(step: "01", title: "きょうのノート",
+                               symbol: "pencil.and.scribble")
+            pagePreview
+            typographyTools
+            DiaryWritingPromptPicker(text: $bodyText)
+            MawaruSectionLabel(step: "03", title: "シールや写真でデコろう",
+                               symbol: "sparkles")
+            DiaryDecorationEditor(decoration: $decoration, showsPreview: false)
+            HStack {
+                Text("本文 \(bodyText.count)/5000文字")
+                Spacer()
+                Text("タイトル \(title.count)/80文字")
             }
-            .background(DiaryStyle.background.opacity(0.55))
-            .navigationTitle(book?.title ?? "きょうの交換日記")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") { saveDraft(); dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Menu {
-                        if nearby.transport.connected.isEmpty {
-                            Text("相手のiPhoneと接続してください")
-                        } else {
-                            ForEach(nearby.transport.connected, id: \.displayName) { peer in
-                                Button("\(peer.displayName)へ渡す") {
-                                    targetPeer = peer
-                                    confirmSend = true
-                                }
-                            }
-                        }
-                    } label: {
-                        Text("次へ渡す")
-                            .fontWeight(.semibold)
-                    }
-                    .disabled(nearby.transport.connected.isEmpty ||
-                              nearby.pendingTransfer(for: bookID) != nil ||
-                              (bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                               decoration.photos.isEmpty) ||
-                              bodyText.count > 5000 || title.count > 80)
-                }
-            }
-            .onAppear {
-                if let data = UserDefaults.standard.data(forKey: draftKey),
-                   let draft = try? JSONDecoder().decode(Draft.self, from: data) {
-                    title = draft.title
-                    bodyText = draft.body
-                    decoration = draft.decoration
-                } else {
-                    decoration = DiaryTypographyPreferences.load()
-                }
-                ready = true
-            }
-            .onChange(of: title) { _, _ in saveDraft() }
-            .onChange(of: bodyText) { _, _ in saveDraft() }
-            .onChange(of: decoration) { _, _ in saveDraft() }
-            .onChange(of: nearby.lastCompletedTransfer) { _, next in
-                if next != nil && next == outgoingID {
-                    UserDefaults.standard.removeObject(forKey: draftKey)
-                    dismiss()
-                }
-            }
-            .confirmationDialog("このページを近くの相手に渡す？",
-                                isPresented: $confirmSend) {
-                Button("バトンを渡す ♡") {
-                    guard let peer = targetPeer else { return }
+            .font(.caption)
+            .foregroundStyle(bodyText.count > 5000 || title.count > 80 ?
+                             Color.red : Color.secondary)
+            Text("送るまでは自分のiPhoneに下書きを保存。会えたときにバトンを渡せるよ。")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private var pagePreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("会えたときに渡せる下書き ♡")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    preview.toggle()
                     saveDraft()
-                    do {
-                        outgoingID = try nearby.sendPage(
-                            bookID: bookID, title: title, body: bodyText,
-                            decoration: decoration, to: peer
-                        )
-                    } catch {
-                        error = error.localizedDescription
+                } label: {
+                    Label(preview ? "編集へ" : "完成プレビュー",
+                          systemImage: preview ? "pencil" : "eye")
+                }
+                .buttonStyle(.bordered)
+            }
+            if preview {
+                NostalgicNotebookReadPage(
+                    title: title, text: bodyText, author: authorName,
+                    date: .now, decoration: decoration,
+                    bookTitle: groupName, pageNumber: pageNumber,
+                    exchangeMode: "近くで交換"
+                )
+            } else {
+                NostalgicNotebookEditor(
+                    title: $title, text: $bodyText, decoration: $decoration,
+                    author: authorName, bookTitle: groupName,
+                    pageNumber: pageNumber, exchangeMode: "近くで交換"
+                )
+            }
+        }
+    }
+
+    private var typographyTools: some View {
+        DisclosureGroup(isExpanded: $showTextTools) {
+            DiaryTypographyControls(
+                decoration: $decoration, resetToSavedPreference: true
+            )
+            .padding(.top, 8)
+        } label: {
+            MawaruSectionLabel(step: "02", title: "このページだけ文字を変更",
+                               symbol: "textformat")
+        }
+        .tint(DiaryStyle.ink)
+    }
+
+    private var sendMenu: some View {
+        Menu {
+            if nearby.transport.connected.isEmpty {
+                Text("相手のiPhoneと接続してください")
+            } else {
+                ForEach(nearby.transport.connected, id: \.displayName) { peer in
+                    Button("\(peer.displayName)へ渡す") {
+                        targetPeer = peer
+                        confirmSend = true
                     }
                 }
-            } message: {
-                Text("相手が受け取りを承認すると、次の人の番になります。")
             }
-            .alert("送信できませんでした", isPresented: Binding(
-                get: { error != nil }, set: { if !$0 { error = nil } }
-            )) { Button("OK") { error = nil } }
-            message: { Text(error ?? "") }
+        } label: {
+            Text("次へ渡す").fontWeight(.semibold)
+        }
+        .disabled(cannotSend)
+    }
+
+    private func loadDraft() {
+        if let data = UserDefaults.standard.data(forKey: draftKey),
+           let draft = try? JSONDecoder().decode(Draft.self, from: data) {
+            title = draft.title
+            bodyText = draft.body
+            decoration = draft.decoration
+        } else {
+            decoration = DiaryTypographyPreferences.load()
+        }
+        ready = true
+    }
+
+    private func send(to peer: MCPeerID) {
+        saveDraft()
+        do {
+            outgoingID = try nearby.sendPage(
+                bookID: bookID, title: title, body: bodyText,
+                decoration: decoration, to: peer
+            )
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 }
