@@ -18,17 +18,20 @@ targets:
   Mawaru:
     type: application
     platform: iOS
+    sources:
+      - path: Mawaru
     info:
       path: Mawaru/Info.plist
       properties:
-        CFBundleDisplayName: "まわる"
-        UILaunchScreen: {}
-        NSPhotoLibraryUsageDescription: "交換日記に写真を添付するために写真を選択します。"
-        NSLocalNetworkUsageDescription: "近くのiPhoneとつながり、交換日記を直接受け渡しするためにローカルネットワークを利用します。"
+        CFBundleDisplayName: 'まわる'
+        CFBundleShortVersionString: '$(MARKETING_VERSION)'
+        CFBundleVersion: '$(CURRENT_PROJECT_VERSION)'
+        NSPhotoLibraryUsageDescription: '交換日記に写真を添付するために写真を選択します。'
+        NSLocalNetworkUsageDescription: '近くの人と交換日記を直接送受信するため、同じ場所にいる端末を探します。'
+        NSBluetoothAlwaysUsageDescription: '近くの人と日記を交換するために、周辺の端末との接続に使用します。'
         NSBonjourServices:
-          - "_mawaru-diary._tcp"
-    sources:
-      - path: Mawaru
+          - '_mawaru-diary._tcp'
+        UILaunchScreen: {}
     dependencies:
       - package: Firebase
         product: FirebaseCore
@@ -49,7 +52,7 @@ targets:
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: '交換日記に写真を添付するために写真を選択します。'
         MARKETING_VERSION: 0.8.0
         CURRENT_PROJECT_VERSION: 8
-        GENERATE_INFOPLIST_FILE: YES
+        GENERATE_INFOPLIST_FILE: NO
         SUPPORTS_MACCATALYST: NO
     scheme:
       testTargets: []

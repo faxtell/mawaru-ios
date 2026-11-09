@@ -211,6 +211,12 @@ final class SharedDiaryStore: ObservableObject {
             "title": title, "body": body, "decoration": decoration.cloudValue
         ])
     }
+    func renameBook(bookID: String, title: String) async throws {
+        _ = try await call("renameNotebook", data: [
+            "bookId": bookID, "title": title
+        ])
+    }
+
     func setPaused(bookID: String, paused: Bool) async throws {
         _ = try await call("setNotebookPaused", data: [
             "bookId": bookID, "paused": paused

@@ -75,18 +75,26 @@ struct NostalgicNotebookPaper: View {
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 23))
             }
-            .overlay(alignment: .leading) {
-                VStack(spacing: 74) {
-                    ForEach(0..<5, id: \.self) { _ in
-                        Circle()
-                            .fill(MawaruPastel.background)
-                            .frame(width: 11, height: 11)
-                            .overlay { Circle().strokeBorder(MawaruPastel.ink.opacity(0.07), lineWidth: 1) }
+            .overlay {
+                Canvas { context, size in
+                    for y in stride(from: CGFloat(58), through: size.height - 22,
+                                    by: CGFloat(76)) {
+                        let hole = Path(ellipseIn: CGRect(x: 8, y: y, width: 11, height: 11))
+                        context.fill(hole, with: .color(MawaruPastel.background))
+                        context.stroke(hole,
+                                       with: .color(MawaruPastel.ink.opacity(0.10)),
+                                       lineWidth: 0.7)
                     }
                 }
-                .padding(.leading, 8)
-                .padding(.top, 48)
-                .frame(maxHeight: .infinity, alignment: .top)
+                .allowsHitTesting(false)
+            }
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(MawaruPastel.rose.opacity(0.55))
+                    .frame(width: 88, height: 17)
+                    .rotationEffect(.degrees(-7))
+                    .offset(x: 15, y: -6)
+                    .allowsHitTesting(false)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 23)
@@ -100,8 +108,9 @@ struct NostalgicNotebookPage<Content: View>: View {
     @Binding var decoration: DiaryDecoration
     var editing = false
     var cloudLocation: DiaryCloudPhotoLocation? = nil
-    var groupTitle = "交換日記"
+    var bookTitle = "ひみつの交換日記"
     var pageNumber: Int? = nil
+    var exchangeMode: String? = nil
     @ViewBuilder let content: () -> Content
     @State private var canvasSize = CGSize(width: 350, height: 480)
     @State private var dropTargeted = false
@@ -109,51 +118,57 @@ struct NostalgicNotebookPage<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 9) {
-                Image(systemName: "book.closed.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(MawaruPastel.ink)
-                    .padding(8)
-                    .background(MawaruPastel.rose.opacity(0.34), in: RoundedRectangle(cornerRadius: 9))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(groupTitle)
-                        .font(.system(size: 15, weight: .black, design: .rounded))
-                        .lineLimit(2)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 7) {
+                    Image(systemName: "book.closed.fill")
+                        .font(.system(size: 11))
+                    Text(bookTitle.isEmpty ? "ひみつの交換日記" : bookTitle)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .lineLimit(1)
                         .minimumScaleFactor(0.75)
-                    Text("EXCHANGE DIARY  ✦  MAWARU")
-                        .font(.system(size: 8, weight: .medium, design: .rounded))
-                        .tracking(1)
+                    Spacer(minLength: 5)
+                    if let pageNumber {
+                        Text(String(format: "NO. %02d", max(1, pageNumber)))
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .fixedSize()
+                    } else {
+                        Text("secret ♡").font(.system(size: 10, weight: .semibold))
+                    }
                 }
-                Spacer(minLength: 5)
-                if let pageNumber {
-                    Text("P. (pageNumber)")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 6)
-                        .background(MawaruPastel.lemon.opacity(0.87), in: Capsule())
-                } else {
-                    Image(systemName: "heart.fill").font(.caption)
+                HStack(spacing: 6) {
+                    Text("mawaru")
+                        .font(.system(size: 9, weight: .bold, design: .serif))
+                    Image(systemName: "heart.fill").font(.system(size: 7))
+                    if let exchangeMode {
+                        Text(exchangeMode).font(.system(size: 9, weight: .medium, design: .rounded))
+                    }
+                    Spacer()
+                    Text("a page for us ✿")
+                        .font(.system(size: 9, weight: .medium, design: .serif))
                 }
+                Rectangle()
+                    .fill(MawaruPastel.rose.opacity(0.40))
+                    .frame(height: 1)
             }
-            .foregroundStyle(MawaruPastel.ink.opacity(0.88))
-            .padding(.bottom, 10)
-
-            Rectangle()
-                .fill(MawaruPastel.rose.opacity(0.40))
-                .frame(height: 1)
-                .padding(.bottom, 14)
+            .foregroundStyle(MawaruPastel.ink.opacity(0.65))
+            .padding(.leading, 25)
+            .padding(.trailing, 6)
+            .padding(.bottom, 14)
 
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 18)
 
-            HStack {
-                Spacer()
-                Text("まわる ♡  きょうの気持ちを、次のページへ")
+            HStack(spacing: 5) {
+                Image(systemName: "heart.fill").font(.system(size: 8))
+                Text("きょうの思い出を、次の人へ")
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                Spacer(minLength: 5)
+                Text("mawaru  ✦")
                     .font(.system(size: 10, weight: .medium, design: .serif))
-                    .foregroundStyle(MawaruPastel.ink.opacity(0.45))
             }
+            .foregroundStyle(MawaruPastel.ink.opacity(0.47))
         }
         .padding(.top, 20)
         .padding(.bottom, 19)
@@ -246,13 +261,15 @@ struct NostalgicNotebookEditor: View {
     @Binding var decoration: DiaryDecoration
     var author = "わたし"
     var date = Date.now
-    var groupTitle = "交換日記"
+    var bookTitle = "ひみつの交換日記"
     var pageNumber: Int? = nil
+    var exchangeMode: String? = nil
 
     var body: some View {
         NostalgicNotebookPage(
             decoration: $decoration, editing: true,
-            groupTitle: groupTitle, pageNumber: pageNumber
+            bookTitle: bookTitle, pageNumber: pageNumber,
+            exchangeMode: exchangeMode
         ) {
             DiaryPageWritingContent(
                 title: $title, text: $text, decoration: decoration,
@@ -270,15 +287,17 @@ struct NostalgicNotebookReadPage: View {
     var decoration: DiaryDecoration
     var attachedPhoto: UIImage? = nil
     var cloudLocation: DiaryCloudPhotoLocation? = nil
-    var groupTitle = "交換日記"
+    var bookTitle = "ひみつの交換日記"
     var pageNumber: Int? = nil
+    var exchangeMode: String? = nil
 
     var body: some View {
         VStack(spacing: 14) {
             NostalgicNotebookPage(
                 decoration: .constant(decoration),
                 editing: false, cloudLocation: cloudLocation,
-                groupTitle: groupTitle, pageNumber: pageNumber
+                bookTitle: bookTitle, pageNumber: pageNumber,
+                exchangeMode: exchangeMode
             ) {
                 DiaryPageWritingContent(
                     title: .constant(title.isEmpty ? "無題のページ ♡" : title),

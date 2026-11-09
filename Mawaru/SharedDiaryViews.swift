@@ -82,14 +82,14 @@ struct SharedHomeScreen: View {
                             Label("招待コードから参加", systemImage: "person.badge.plus")
                                 .frame(maxWidth: .infinity).padding(11)
                         }.buttonStyle(.bordered)
-                        Text("共有日記は参加者だけが閲覧できます。文章とシール・紙のデザインを同期。写真・通知は次の段階で対応します。")
+                        Text("オンライン日記は参加者だけが閲覧できます。本文・シール・切り抜き写真も同期。通知機能は今後対応予定です。")
                             .font(.footnote).foregroundStyle(.secondary)
                     }.padding(20)
                 }
                 .background(DiaryStyle.background.opacity(0.55))
             }
         }
-        .navigationTitle("はなれて交換")
+        .navigationTitle("遠くの人・オンライン")
         .sheet(isPresented: $creating) { SharedCreateScreen() }
         .sheet(isPresented: $joining) { SharedJoinScreen() }
         .alert("共有機能のエラー",
@@ -124,7 +124,7 @@ private struct SharedCover: View {
 struct SharedCreateScreen: View {
     @EnvironmentObject private var shared: SharedDiaryStore
     @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
+    @State private var title = "ふたりの交換日記"
     @State private var name = "わたし"
     @State private var cover = 0
     @State private var busy = false
@@ -133,9 +133,11 @@ struct SharedCreateScreen: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("日記帳") {
-                    TextField("例：ふたりの交換日記", text: $title)
+                Section("交換日記のグループ名") {
+                    TextField("例：放課後のひみつノート", text: $title)
                         .textInputAutocapitalization(.never)
+                    Text("この名前が表紙とすべての日記ページに表示されます。")
+                        .font(.caption).foregroundStyle(.secondary)
                     TextField("日記に表示する名前", text: $name)
                 }
                 Section("表紙の色") {
@@ -242,6 +244,7 @@ struct SharedBookScreen: View {
     @State private var listener: ListenerRegistration?
     @State private var editing = false
     @State private var inviteCode: String?
+    @State private var renaming = false
     @State private var busy = false
     @State private var error: String?
 
@@ -305,7 +308,8 @@ struct SharedBookScreen: View {
                                 cloudLocation: DiaryCloudPhotoLocation(
                                     bookID: bookID, entryID: page.id, authorID: page.authorID
                                 ),
-                                groupTitle: book.title, pageNumber: page.sequence
+                                bookTitle: book.title, pageNumber: page.sequence,
+                                exchangeMode: "遠くで交換"
                             )
                         }
                     }
@@ -320,11 +324,19 @@ struct SharedBookScreen: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if let book, book.ownerID == shared.uid {
-                    Button(book.paused ? "再開" : "休止") {
-                        Task {
-                            do { try await shared.setPaused(bookID: bookID, paused: !book.paused) }
-                            catch { self.error = error.localizedDescription }
+                    Menu {
+                        Button("グループ名を変更", systemImage: "pencil") {
+                            renaming = true
                         }
+                        Button(book.paused ? "日記を再開" : "日記を休止",
+                               systemImage: book.paused ? "play.fill" : "pause.fill") {
+                            Task {
+                                do { try await shared.setPaused(bookID: bookID, paused: !book.paused) }
+                                catch { self.error = error.localizedDescription }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
             }
@@ -338,6 +350,11 @@ struct SharedBookScreen: View {
             listener = nil
         }
         .sheet(isPresented: $editing) { SharedEditorScreen(bookID: bookID) }
+        .sheet(isPresented: $renaming) {
+            if let book {
+                SharedRenameScreen(bookID: bookID, initialTitle: book.title)
+            }
+        }
         .sheet(item: Binding<InviteSheet?>(
             get: { inviteCode.map { InviteSheet(code: $0) } },
             set: { inviteCode = $0?.code }
@@ -421,15 +438,17 @@ struct SharedEditorScreen: View {
                             title: title, text: bodyText,
                             author: shared.displayName,
                             date: .now, decoration: decoration,
-                            groupTitle: shared.books.first(where: { $0.id == bookID })?.title ?? "交換日記",
-                            pageNumber: (shared.books.first(where: { $0.id == bookID })?.lastSequence ?? 0) + 1
+                            bookTitle: shared.books.first(where: { $0.id == bookID })?.title ?? "交換日記",
+                            pageNumber: (shared.books.first(where: { $0.id == bookID })?.lastSequence ?? 0) + 1,
+                            exchangeMode: "遠くで交換"
                         )
                     } else {
                         NostalgicNotebookEditor(
                             title: $title, text: $bodyText, decoration: $decoration,
                             author: shared.displayName,
-                            groupTitle: shared.books.first(where: { $0.id == bookID })?.title ?? "交換日記",
-                            pageNumber: (shared.books.first(where: { $0.id == bookID })?.lastSequence ?? 0) + 1
+                            bookTitle: shared.books.first(where: { $0.id == bookID })?.title ?? "交換日記",
+                            pageNumber: (shared.books.first(where: { $0.id == bookID })?.lastSequence ?? 0) + 1,
+                            exchangeMode: "遠くで交換"
                         )
                         .onChange(of: title) { _, _ in saveDraft() }
                         .onChange(of: bodyText) { _, _ in saveDraft() }
@@ -512,6 +531,58 @@ struct SharedEditorScreen: View {
             }
             .alert("日記を渡せませんでした", isPresented: Binding(
                 get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("OK") { error = nil }
+            } message: { Text(error ?? "") }
+        }
+    }
+}
+
+
+struct SharedRenameScreen: View {
+    @EnvironmentObject private var shared: SharedDiaryStore
+    @Environment(\.dismiss) private var dismiss
+    let bookID: String
+    @State private var title: String
+    @State private var busy = false
+    @State private var error: String?
+
+    init(bookID: String, initialTitle: String) {
+        self.bookID = bookID
+        _title = State(initialValue: initialTitle)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("日記帳のグループ名") {
+                    TextField("ふたりの交換日記", text: $title)
+                    Text("名前を変えると、参加者全員の表紙と日記ページにも反映されるよ。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("グループ名を変更")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("キャンセル") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(busy ? "保存中" : "保存") {
+                        busy = true
+                        Task {
+                            do {
+                                try await shared.renameBook(bookID: bookID, title: title)
+                                dismiss()
+                            } catch { error = error.localizedDescription }
+                            busy = false
+                        }
+                    }
+                    .disabled(busy || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                              title.count > 60)
+                }
+            }
+            .alert("変更できませんでした", isPresented: Binding(
+                get: { error != nil }, set: { if !$0 { error = nil } }
+            )) {
                 Button("OK") { error = nil }
             } message: { Text(error ?? "") }
         }

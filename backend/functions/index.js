@@ -159,6 +159,21 @@ exports.submitEntry = onCall(callableOptions, async (request) => {
   });
 });
 
+// Only the creator may rename a notebook; every participant sees the new
+// group name in the cover, list, and all diary page headers.
+exports.renameNotebook = onCall(callableOptions, async (request) => {
+  const uid = requireUser(request);
+  const ref = bookRef(request.data?.bookId);
+  const title = checked(request.data?.title, 60, "グループ名");
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) fail("not-found", "日記帳が見つかりません。");
+    if (snap.data().ownerId !== uid) fail("permission-denied", "作成者のみ名前を変更できます。");
+    tx.update(ref, {title, updatedAt: FieldValue.serverTimestamp()});
+  });
+  return {ok: true};
+});
+
 exports.setNotebookPaused = onCall(callableOptions, async (request) => {
   const uid = requireUser(request);
   const ref = bookRef(request.data?.bookId);
