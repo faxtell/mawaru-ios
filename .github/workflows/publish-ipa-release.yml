@@ -1,0 +1,55 @@
+name: Publish IPA as GitHub Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-ipa-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Download verified iOS IPA build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 42810206364 \
+            --repo faxtell/mawaru-ios \
+            --name Mawaru-unsigned-IPA \
+            --dir dist
+          test -s dist/Mawaru-unsigned.ipa
+          mv dist/Mawaru-unsigned.ipa dist/Mawaru-v0.9.0-unsigned.ipa
+          echo 'faba413a78434e26079524ab4a3d0591256b5a497a2a4daceeaeb583bcdf4c91  dist/Mawaru-v0.9.0-unsigned.ipa' | sha256sum --check
+          (cd dist && zip -q -9 Mawaru-v0.9.0-unsigned.zip Mawaru-v0.9.0-unsigned.ipa)
+
+      - name: Publish public download links
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.9.0 --repo faxtell/mawaru-ios >/dev/null 2>&1; then
+            gh release upload v0.9.0 \
+              dist/Mawaru-v0.9.0-unsigned.ipa \
+              dist/Mawaru-v0.9.0-unsigned.zip \
+              --clobber --repo faxtell/mawaru-ios
+          else
+            gh release create v0.9.0 \
+              dist/Mawaru-v0.9.0-unsigned.ipa \
+              dist/Mawaru-v0.9.0-unsigned.zip \
+              --repo faxtell/mawaru-ios \
+              --target "${GITHUB_SHA}" \
+              --title "まわる v0.9.0 — IPAダウンロード" \
+              --notes "交換日記アプリのアプリアイコン・省スクロールUIを含むv0.9.0。IPAは未署名のため、インストールには個別の署名が必要です。"
+          fi
+          gh release view v0.9.0 --repo faxtell/mawaru-ios \
+            --json assets,url \
+            --jq '{release: .url, assets: [.assets[].name]}'
