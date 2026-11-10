@@ -195,14 +195,26 @@ struct HomeScreen: View {
     @State private var creating = false
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                MawaruHomeHeader(
-                    headline: "今日のきもちを、\n次のページへ ♡",
-                    subtitle: "友だち・恋人と、ゆるっとつづる交換日記。"
-                ).padding(.top, 12)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("日記帳")
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .foregroundStyle(MawaruContrast.ink)
+                Button { creating = true } label: {
+                    Label("新しい日記帳を作る", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(DiaryStyle.ink)
                 if store.books.isEmpty {
-                    ContentUnavailableView("まだ日記帳がありません", systemImage: "book.closed",
-                        description: Text("まずは一冊、作ってみよう。"))
+                    Label("まだ日記帳はありません。最初の1冊を作ろう。",
+                          systemImage: "book.closed")
+                        .font(.footnote)
+                        .foregroundStyle(MawaruContrast.secondaryInk)
+                        .padding(15)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(MawaruContrast.surface,
+                                    in: RoundedRectangle(cornerRadius: 16))
                 }
                 ForEach(store.books) { book in
                     NavigationLink {
@@ -225,12 +237,8 @@ struct HomeScreen: View {
                         .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 23))
                     }.buttonStyle(.plain)
                 }
-                Button { creating = true } label: {
-                    Label("あたらしい日記帳をつくる ♡", systemImage: "plus")
-                        .font(.headline).frame(maxWidth: .infinity).padding(14)
-                }.buttonStyle(.borderedProminent).tint(DiaryStyle.ink)
-                Text("ここは従来の端末内おためし日記です。実際に別のiPhoneと交換するときは「交換する」タブから近く・遠くのモードを選んでね。")
-                    .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
+                Text("この端末だけで試すデモモードです。")
+                    .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
             }.padding(20)
         }
         .background(DiaryStyle.background.opacity(0.55))
@@ -306,9 +314,9 @@ struct BookScreen: View {
     var body: some View {
         ScrollView {
             if let book {
-                VStack(alignment: .leading, spacing: 20) {
-                    HStack(spacing: 18) {
-                        BookCover(book: book)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 13) {
+                        BookCover(book: book, small: true)
                         VStack(alignment: .leading, spacing: 7) {
                             Text(book.title).font(.title2.bold())
                             Text("\(book.members.count)人でつづる交換日記")
@@ -360,37 +368,28 @@ struct BookScreen: View {
                             .foregroundStyle(MawaruContrast.secondaryInk)
                     }
                     if store.pages(of: bookID).isEmpty {
-                        ContentUnavailableView("まだ白紙の一冊", systemImage: "text.book.closed",
-                            description: Text("最初のページを書いてみよう。"))
+                        Label("まだ白紙の一冊。最初のページを書いてみよう。",
+                              systemImage: "text.book.closed")
+                            .font(.footnote)
+                            .foregroundStyle(MawaruContrast.secondaryInk)
+                            .padding(13)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(MawaruContrast.surface,
+                                        in: RoundedRectangle(cornerRadius: 15))
                     } else {
                         ForEach(store.pages(of: bookID)) { page in
                             NavigationLink { DiaryPageScreen(entryID: page.id) } label: {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        Text(page.author).font(.caption)
-                                        Spacer()
-                                        Text(page.date, style: .date).font(.caption)
-                                    }.foregroundStyle(MawaruContrast.secondaryInk)
-                                    Text(page.title.isEmpty ? "無題のページ" : page.title)
-                                        .font(.system(.title3, design: .serif, weight: .semibold))
-                                    Text(page.text).font(.body).lineLimit(3)
-                                    if page.photoFilename != nil { Label("写真付き", systemImage: "photo").font(.caption) }
-                                    if let decor = page.decoration, !decor.stickers.isEmpty {
-                                        Label("シール \(decor.stickers.count)枚", systemImage: "sparkles").font(.caption)
-                                    }
-                                    if let decor = page.decoration, !decor.photos.isEmpty {
-                                        Label("貼り付け画像 \(decor.photos.count)枚", systemImage: "photo.on.rectangle")
-                                            .font(.caption)
-                                    }
-                                    HStack {
-                                        if page.hearted { Image(systemName: "heart.fill") }
-                                        if page.favorite { Image(systemName: "bookmark.fill") }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                    }.font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
-                                }
-                                .foregroundStyle(MawaruContrast.ink).padding(18)
-                                .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 19))
+                                DiaryCompactPageRow(
+                                    pageNumber: store.pages(of: bookID)
+                                        .sorted { $0.date < $1.date }
+                                        .firstIndex(where: { $0.id == page.id })
+                                        .map { $0 + 1 } ?? 1,
+                                    title: page.title, author: page.author,
+                                    excerpt: page.text, date: page.date,
+                                    stickerCount: page.decoration?.stickers.count ?? 0,
+                                    photoCount: (page.decoration?.photos.count ?? 0) +
+                                        (page.photoFilename == nil ? 0 : 1)
+                                )
                             }.buttonStyle(.plain)
                         }
                     }

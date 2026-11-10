@@ -39,17 +39,39 @@ struct SharedHomeScreen: View {
                 .padding(30)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        MawaruHomeHeader(
-                            headline: "ふたりで1冊、\nひみつの日記帳 ♡",
-                            subtitle: "ゆるく、かわいく。大切な人にバトンを渡そう。"
-                        )
-                        Text("サインイン中：\(shared.displayName)")
-                            .foregroundStyle(MawaruContrast.secondaryInk)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("日記帳")
+                                .font(.system(.title3, design: .rounded, weight: .bold))
+                            Spacer()
+                            Text(shared.displayName)
+                                .font(.caption)
+                                .foregroundStyle(MawaruContrast.secondaryInk)
+                        }
+                        HStack(spacing: 10) {
+                            Button { creating = true } label: {
+                                Label("新しく作る", systemImage: "plus")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(DiaryStyle.ink)
+                            Button { joining = true } label: {
+                                Label("招待で参加", systemImage: "person.badge.plus")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(DiaryStyle.ink)
+                        }
+                        .controlSize(.large)
                         if shared.books.isEmpty {
-                            ContentUnavailableView("共有日記はまだありません",
-                                systemImage: "book.closed",
-                                description: Text("日記帳を作るか、届いた招待コードで参加してね。"))
+                            Label("日記帳を作るか、招待コードから参加してね。",
+                                  systemImage: "book.closed")
+                                .font(.footnote)
+                                .foregroundStyle(MawaruContrast.secondaryInk)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(15)
+                                .background(MawaruContrast.surface,
+                                            in: RoundedRectangle(cornerRadius: 16))
                         }
                         ForEach(shared.books) { book in
                             NavigationLink {
@@ -74,25 +96,18 @@ struct SharedHomeScreen: View {
                                 .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 22))
                             }.buttonStyle(.plain)
                         }
-                        Button { creating = true } label: {
-                            Label("新しい共有日記を作る", systemImage: "plus")
-                                .frame(maxWidth: .infinity).padding(13)
-                        }.buttonStyle(.borderedProminent).tint(DiaryStyle.ink)
-                        Button { joining = true } label: {
-                            Label("招待コードから参加", systemImage: "person.badge.plus")
-                                .frame(maxWidth: .infinity).padding(11)
-                        }.buttonStyle(.bordered)
-                        Text("オンライン日記は参加者だけが閲覧できます。本文・シール・切り抜き写真も同期。通知機能は今後対応予定です。")
-                            .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
+                        Text("オンライン日記は参加者だけが閲覧できます。")
+                            .font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
                     }
-                    .padding(20)
-                    .padding(.bottom, 88)
+                    .padding(16)
+                    .padding(.bottom, 24)
                     .foregroundStyle(MawaruContrast.ink)
                 }
                 .background(DiaryStyle.background)
             }
         }
         .navigationTitle("遠くの人・オンライン")
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $creating) { SharedCreateScreen() }
         .sheet(isPresented: $joining) { SharedJoinScreen() }
         .alert("共有機能のエラー",
@@ -119,7 +134,7 @@ private struct SharedCover: View {
                         .lineLimit(3).multilineTextAlignment(.center)
                 }.foregroundStyle(MawaruContrast.ink).padding(5)
             }
-            .frame(width: 74, height: 95)
+            .frame(width: 62, height: 78)
             .accessibilityLabel("共有日記帳 \(book.title)")
     }
 }
@@ -256,8 +271,8 @@ struct SharedBookScreen: View {
     var body: some View {
         ScrollView {
             if let book {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack(alignment: .center, spacing: 20) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 14) {
                         SharedCover(book: book)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(book.title).font(.system(.title2, design: .serif, weight: .bold))
@@ -268,24 +283,40 @@ struct SharedBookScreen: View {
                                 .foregroundStyle(DiaryStyle.ink)
                         }
                     }
-                    VStack(alignment: .leading, spacing: 11) {
-                        Text("バトンの順番").font(.headline)
-                        ForEach(book.memberNames.indices, id: \.self) { index in
-                            HStack {
-                                Image(systemName: index == book.currentTurn ? "circle.inset.filled" : "circle")
-                                Text(book.memberNames[index])
-                                if book.memberIDs[index] == shared.uid {
-                                    Text("あなた").font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: 9) {
+                            ForEach(book.memberNames.indices, id: \.self) { index in
+                                HStack(spacing: 8) {
+                                    Image(systemName: index == book.currentTurn ?
+                                          "heart.circle.fill" : "circle")
+                                    Text(book.memberNames[index])
+                                    if book.memberIDs[index] == shared.uid {
+                                        Text("あなた")
+                                            .font(.caption)
+                                            .foregroundStyle(MawaruContrast.secondaryInk)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
-                                if index == book.currentTurn { Text("執筆担当").font(.caption) }
+                                .font(.subheadline)
                             }
                         }
+                        .padding(.top, 8)
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text("次は \(book.currentWriter) の番")
+                                .font(.subheadline.weight(.semibold))
+                            Spacer(minLength: 3)
+                            Text("\(book.memberIDs.count)人")
+                                .font(.caption)
+                                .foregroundStyle(MawaruContrast.secondaryInk)
+                        }
                     }
-                    .padding(18)
+                    .tint(DiaryStyle.ink)
+                    .padding(13)
                     .foregroundStyle(MawaruContrast.ink)
                     .background(MawaruContrast.surface,
-                                in: RoundedRectangle(cornerRadius: 20))
+                                in: RoundedRectangle(cornerRadius: 17))
                     if book.isMyTurn(shared.uid) {
                         Button { editing = true } label: {
                             Label("日記を書いて渡す", systemImage: "pencil.line")
@@ -307,21 +338,28 @@ struct SharedBookScreen: View {
                         ContentUnavailableView("まだ白紙の一冊", systemImage: "book.closed")
                     } else {
                         ForEach(pages) { page in
-                            NostalgicNotebookReadPage(
-                                title: page.title, text: page.body,
-                                author: page.author, date: page.createdAt,
-                                decoration: page.decoration,
-                                cloudLocation: DiaryCloudPhotoLocation(
-                                    bookID: bookID, entryID: page.id, authorID: page.authorID
-                                ),
-                                bookTitle: book.title, pageNumber: page.sequence,
-                                exchangeMode: "遠くで交換"
-                            )
+                            NavigationLink {
+                                SharedPageDetailScreen(
+                                    bookTitle: book.title,
+                                    bookID: bookID, page: page
+                                )
+                            } label: {
+                                DiaryCompactPageRow(
+                                    pageNumber: page.sequence,
+                                    title: page.title,
+                                    author: page.author,
+                                    excerpt: page.body,
+                                    date: page.createdAt,
+                                    stickerCount: page.decoration.stickers.count,
+                                    photoCount: page.decoration.photos.count
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
-                .padding(18)
-                .padding(.bottom, 88)
+                .padding(16)
+                .padding(.bottom, 28)
                 .foregroundStyle(MawaruContrast.ink)
             } else {
                 ContentUnavailableView("日記帳が見つかりません", systemImage: "book.closed")
@@ -396,6 +434,31 @@ struct SharedBookScreen: View {
         } message: { Text(error ?? "") }
     }
 }
+struct SharedPageDetailScreen: View {
+    let bookTitle: String
+    let bookID: String
+    let page: SharedPage
+
+    var body: some View {
+        ScrollView {
+            NostalgicNotebookReadPage(
+                title: page.title, text: page.body,
+                author: page.author, date: page.createdAt,
+                decoration: page.decoration,
+                cloudLocation: DiaryCloudPhotoLocation(
+                    bookID: bookID, entryID: page.id, authorID: page.authorID
+                ),
+                bookTitle: bookTitle, pageNumber: page.sequence,
+                exchangeMode: "遠くで交換"
+            )
+            .padding(16)
+        }
+        .background(DiaryStyle.background)
+        .navigationTitle("ページ \(page.sequence)")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 private struct InviteSheet: Identifiable {
     let code: String
     var id: String { code }

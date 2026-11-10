@@ -293,6 +293,7 @@ struct NearbyHomeScreen: View {
 
 struct NearbyBookCover: View {
     var book: NearbyBook
+    var compact = false
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12)
@@ -309,7 +310,7 @@ struct NearbyBookCover: View {
             .foregroundStyle(DiaryStyle.ink)
             .padding(6)
         }
-        .frame(width: 75, height: 98)
+        .frame(width: compact ? 58 : 75, height: compact ? 76 : 98)
     }
 }
 
@@ -393,15 +394,15 @@ struct NearbyBookScreen: View {
     var body: some View {
         ScrollView {
             if let book {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 12) {
                     bookHeader(book)
                     NearbyConnectionPanel(transport: nearby.transport)
                     turnOrder(book)
                     handoffControls(book)
                     pagesSection(book)
                 }
-                .padding(18)
-                .padding(.bottom, 88) // Keep the final card clear of iOS's floating tab bar.
+                .padding(16)
+                .padding(.bottom, 28)
                 .foregroundStyle(MawaruContrast.ink)
             }
         }
@@ -423,7 +424,7 @@ struct NearbyBookScreen: View {
 
     private func bookHeader(_ book: NearbyBook) -> some View {
         HStack(spacing: 16) {
-            NearbyBookCover(book: book)
+            NearbyBookCover(book: book, compact: true)
             VStack(alignment: .leading, spacing: 6) {
                 Text(book.title)
                     .font(.system(.title2, design: .rounded, weight: .bold))
@@ -437,39 +438,35 @@ struct NearbyBookScreen: View {
     }
 
     private func turnOrder(_ book: NearbyBook) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("バトンの順番", systemImage: "heart.circle")
-                .font(.system(.headline, design: .rounded, weight: .bold))
+        HStack(spacing: 9) {
+            Image(systemName: "arrow.triangle.2.circlepath")
                 .foregroundStyle(MawaruContrast.ink)
+            Text("順番")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(MawaruContrast.secondaryInk)
             ForEach(book.members.indices, id: \.self) { index in
-                HStack {
-                    Image(systemName: index == book.currentTurn ?
-                          "heart.circle.fill" : "circle")
-                        .foregroundStyle(DiaryStyle.ink)
+                HStack(spacing: 3) {
+                    if index > 0 {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 9, weight: .bold))
+                    }
                     Text(book.members[index].name)
-                    if book.members[index].id == nearby.deviceID {
-                        Text("あなた").font(.caption).foregroundStyle(MawaruContrast.secondaryInk)
-                    }
-                    Spacer()
-                    if index == book.currentTurn {
-                        Text("次に書く人")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(MawaruContrast.ink)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(MawaruPastel.rose.opacity(0.55),
-                                        in: Capsule())
-                    }
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
+                .font(.subheadline.weight(index == book.currentTurn ? .bold : .regular))
+                .foregroundStyle(MawaruContrast.ink)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 6)
+                .background(index == book.currentTurn ?
+                    MawaruPastel.rose.opacity(0.52) : Color.clear,
+                    in: Capsule())
             }
+            Spacer(minLength: 0)
         }
-        .padding(18)
-        .foregroundStyle(MawaruContrast.ink)
-        .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 22))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22)
-                .strokeBorder(MawaruContrast.border.opacity(0.5), lineWidth: 1)
-        }
+        .padding(11)
+        .background(MawaruContrast.surface, in: RoundedRectangle(cornerRadius: 15))
+        .accessibilityLabel("書く順番。次は\(book.currentWriter)の番")
     }
 
     @ViewBuilder
@@ -498,9 +495,8 @@ struct NearbyBookScreen: View {
                         in: RoundedRectangle(cornerRadius: 22))
         } else if !book.isPaired {
             VStack(alignment: .leading, spacing: 10) {
-                Text("① 相手のiPhoneと接続する")
-                    .font(.subheadline.weight(.semibold))
-                Text("② この日記帳を相手へ送る")
+                Label("接続した相手に日記帳を送ろう",
+                      systemImage: "person.crop.circle.badge.plus")
                     .font(.subheadline.weight(.semibold))
                 NearbyPeerActionMenu(
                     transport: nearby.transport,
@@ -511,7 +507,7 @@ struct NearbyBookScreen: View {
                     catch { self.error = error.localizedDescription }
                 }
             }
-            .padding(18)
+            .padding(13)
             .foregroundStyle(MawaruContrast.ink)
             .background(MawaruPastel.mint.opacity(0.63),
                         in: RoundedRectangle(cornerRadius: 22))
@@ -549,14 +545,42 @@ struct NearbyBookScreen: View {
                     description: Text("最初の1ページが待っているよ。"))
             }
             ForEach(nearby.pages(in: bookID)) { page in
-                NostalgicNotebookReadPage(
-                    title: page.title, text: page.body, author: page.author,
-                    date: page.createdAt, decoration: page.decoration,
-                    bookTitle: book.title, pageNumber: max(1, page.sequence - 1),
-                    exchangeMode: "近くで交換"
-                )
+                NavigationLink {
+                    NearbyPageDetailScreen(page: page, bookTitle: book.title)
+                } label: {
+                    DiaryCompactPageRow(
+                        pageNumber: max(1, page.sequence - 1),
+                        title: page.title,
+                        author: page.author,
+                        excerpt: page.body,
+                        date: page.createdAt,
+                        stickerCount: page.decoration.stickers.count,
+                        photoCount: page.decoration.photos.count
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
+    }
+}
+
+struct NearbyPageDetailScreen: View {
+    let page: NearbyPage
+    let bookTitle: String
+
+    var body: some View {
+        ScrollView {
+            NostalgicNotebookReadPage(
+                title: page.title, text: page.body, author: page.author,
+                date: page.createdAt, decoration: page.decoration,
+                bookTitle: bookTitle, pageNumber: max(1, page.sequence - 1),
+                exchangeMode: "近くで交換"
+            )
+            .padding(16)
+        }
+        .background(DiaryStyle.background)
+        .navigationTitle("ページ \(max(1, page.sequence - 1))")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
