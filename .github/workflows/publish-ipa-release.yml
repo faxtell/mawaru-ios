@@ -22,34 +22,34 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          gh run download 42810206364 \
+          gh run download 43221438437 \
             --repo faxtell/mawaru-ios \
             --name Mawaru-unsigned-IPA \
             --dir dist
           test -s dist/Mawaru-unsigned.ipa
-          mv dist/Mawaru-unsigned.ipa dist/Mawaru-v0.9.0-unsigned.ipa
-          echo 'faba413a78434e26079524ab4a3d0591256b5a497a2a4daceeaeb583bcdf4c91  dist/Mawaru-v0.9.0-unsigned.ipa' | sha256sum --check
-          (cd dist && zip -q -9 Mawaru-v0.9.0-unsigned.zip Mawaru-v0.9.0-unsigned.ipa)
+          mv dist/Mawaru-unsigned.ipa dist/Mawaru-v0.9.1-unsigned.ipa
+          echo '88392365d9b4f6bdfb0475953a80d911ce7a73960d417e96baebde29c96a1a47  dist/Mawaru-v0.9.1-unsigned.ipa' | sha256sum --check
+          (cd dist && zip -q -9 Mawaru-v0.9.1-unsigned.zip Mawaru-v0.9.1-unsigned.ipa)
 
       - name: Publish public download links
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view v0.9.0 --repo faxtell/mawaru-ios >/dev/null 2>&1; then
-            gh release upload v0.9.0 \
-              dist/Mawaru-v0.9.0-unsigned.ipa \
-              dist/Mawaru-v0.9.0-unsigned.zip \
+          if gh release view v0.9.1 --repo faxtell/mawaru-ios >/dev/null 2>&1; then
+            gh release upload v0.9.1 \
+              dist/Mawaru-v0.9.1-unsigned.ipa \
+              dist/Mawaru-v0.9.1-unsigned.zip \
               --clobber --repo faxtell/mawaru-ios
           else
-            gh release create v0.9.0 \
-              dist/Mawaru-v0.9.0-unsigned.ipa \
-              dist/Mawaru-v0.9.0-unsigned.zip \
+            gh release create v0.9.1 \
+              dist/Mawaru-v0.9.1-unsigned.ipa \
+              dist/Mawaru-v0.9.1-unsigned.zip \
               --repo faxtell/mawaru-ios \
-              --target "${GITHUB_SHA}" \
-              --title "まわる v0.9.0 — IPAダウンロード" \
-              --notes "交換日記アプリのアプリアイコン・省スクロールUIを含むv0.9.0。IPAは未署名のため、インストールには個別の署名が必要です。"
+              --target "668f98a489d40e819916d2a869705496ee3d7801" \
+              --title "まわる v0.9.1 — IPAダウンロード" \
+              --notes "「近くの人」で接続前から下書き作成、Z世代向けお題4ジャンルを追加したv0.9.1。未署名IPAのため、インストール前に別途署名が必要です。"
           fi
-          gh release view v0.9.0 --repo faxtell/mawaru-ios \
+          gh release view v0.9.1 --repo faxtell/mawaru-ios \
             --json assets,url \
             --jq '{release: .url, assets: [.assets[].name]}'
