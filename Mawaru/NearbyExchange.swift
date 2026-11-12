@@ -23,9 +23,16 @@ struct NearbyBook: Codable, Identifiable {
 
     var isPaired: Bool { members.count == 2 && !members[1].id.isEmpty }
     var currentWriter: String { members.indices.contains(currentTurn) ? members[currentTurn].name : "―" }
-    func isMyTurn(_ deviceID: String) -> Bool {
-        isPaired && members.indices.contains(currentTurn) &&
+
+    // Writing is an offline, local-only operation. Pairing is required when
+    // transferring a page, not for preparing the author's first draft.
+    func canWriteDraft(_ deviceID: String) -> Bool {
+        members.indices.contains(currentTurn) &&
             members[currentTurn].id == deviceID
+    }
+
+    func isMyTurn(_ deviceID: String) -> Bool {
+        isPaired && canWriteDraft(deviceID)
     }
 }
 

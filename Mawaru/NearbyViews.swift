@@ -396,6 +396,7 @@ struct NearbyBookScreen: View {
             if let book {
                 VStack(alignment: .leading, spacing: 12) {
                     bookHeader(book)
+                    draftAction(book)
                     NearbyConnectionPanel(transport: nearby.transport)
                     turnOrder(book)
                     handoffControls(book)
@@ -434,6 +435,36 @@ struct NearbyBookScreen: View {
                     .font(.caption).foregroundStyle(DiaryStyle.ink)
             }
             Spacer(minLength: 0)
+        }
+    }
+
+    // Drafts are local: pairing is required only when transferring a page.
+    @ViewBuilder
+    private func draftAction(_ book: NearbyBook) -> some View {
+        if book.canWriteDraft(nearby.deviceID) &&
+           nearby.pendingTransfer(for: bookID)?.packet.kind != "page" {
+            Button { editing = true } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "square.and.pencil").font(.title3)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("日記を書く")
+                            .font(.system(.headline, design: .rounded, weight: .bold))
+                        Text(book.isPaired
+                             ? "下書きして、会ったら次の人へ渡そう"
+                             : "接続前でも書けるよ・自動で下書き保存")
+                            .font(.caption)
+                            .opacity(0.90)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.caption.weight(.bold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(DiaryStyle.ink)
+            .accessibilityLabel("日記を書く。接続前でも下書きを保存できます")
         }
     }
 
@@ -515,14 +546,7 @@ struct NearbyBookScreen: View {
                 RoundedRectangle(cornerRadius: 22)
                     .strokeBorder(MawaruContrast.ink.opacity(0.10), lineWidth: 1)
             }
-        } else if book.isMyTurn(nearby.deviceID) {
-            Button { editing = true } label: {
-                Label("ページを書いて、会ったときに渡す ♡", systemImage: "pencil.line")
-                    .frame(maxWidth: .infinity).padding(14)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(DiaryStyle.ink)
-        } else {
+        } else if !book.canWriteDraft(nearby.deviceID) {
             Label("\(book.currentWriter)が書く番だよ。次に会ったときに受け取ろう ♡",
                   systemImage: "heart")
                 .font(.subheadline)
@@ -630,6 +654,7 @@ struct NearbyEditorScreen: View {
     private var groupName: String { book?.title ?? "交換日記" }
     private var authorName: String { book?.currentWriter ?? "わたし" }
     private var cannotSend: Bool {
+        book?.isMyTurn(nearby.deviceID) != true ||
         nearby.transport.connected.isEmpty ||
         nearby.pendingTransfer(for: bookID) != nil ||
         (bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -665,7 +690,10 @@ struct NearbyEditorScreen: View {
                         sendMenu
                     }
                 }
-                .onAppear(perform: loadDraft)
+                .onAppear {
+                    nearby.transport.start()
+                    loadDraft()
+                }
                 .onChange(of: title) { _, _ in saveDraft() }
                 .onChange(of: bodyText) { _, _ in saveDraft() }
                 .onChange(of: decoration) { _, _ in saveDraft() }
@@ -711,8 +739,14 @@ struct NearbyEditorScreen: View {
             .font(.caption)
             .foregroundStyle(bodyText.count > 5000 || title.count > 80 ?
                              Color.red : Color.secondary)
-            Text("送るまでは自分のiPhoneに下書きを保存。会えたときにバトンを渡せるよ。")
-                .font(.footnote).foregroundStyle(MawaruContrast.secondaryInk)
+            Label(
+                book?.isPaired == true
+                    ? "下書きはこのiPhoneに保存。相手と接続したときだけ渡せるよ。"
+                    : "接続前でも下書きOK！まず書いて、あとで日記帳に友だちを招待しよう。",
+                systemImage: "checkmark.shield"
+            )
+            .font(.footnote)
+            .foregroundStyle(MawaruContrast.secondaryInk)
         }
     }
 
@@ -761,22 +795,28 @@ struct NearbyEditorScreen: View {
         .tint(DiaryStyle.ink)
     }
 
+    @ViewBuilder
     private var sendMenu: some View {
-        Menu {
-            if nearby.transport.connected.isEmpty {
-                Text("相手のiPhoneと接続してください")
-            } else {
+        if book?.isPaired != true || nearby.transport.connected.isEmpty {
+            Button("下書きを保存") {
+                saveDraft()
+                dismiss()
+            }
+            .fontWeight(.semibold)
+            .accessibilityHint("近くの相手との接続前でも日記を保存できます")
+        } else {
+            Menu {
                 ForEach(nearby.transport.connected, id: \.displayName) { peer in
                     Button("\(peer.displayName)へ渡す") {
                         targetPeer = peer
                         confirmSend = true
                     }
                 }
+            } label: {
+                Text("次へ渡す").fontWeight(.semibold)
             }
-        } label: {
-            Text("次へ渡す").fontWeight(.semibold)
+            .disabled(cannotSend)
         }
-        .disabled(cannotSend)
     }
 
     private func loadDraft() {

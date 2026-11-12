@@ -716,7 +716,7 @@ struct SettingsScreen: View {
             }
             Section("アプリについて") {
                 LabeledContent("アプリ名", value: "まわる")
-                LabeledContent("バージョン", value: "0.7.0")
+                LabeledContent("バージョン", value: "0.9.1")
                 LabeledContent("ローカル日記", value: "このiPhone内")
             }
             Section("データ管理") {
