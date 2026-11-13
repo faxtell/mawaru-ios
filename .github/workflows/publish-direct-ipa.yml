@@ -1,0 +1,64 @@
+name: Publish direct-download IPA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-direct-ipa.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Get the verified v0.9.1 IPA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/out"
+          gh run download 43221438437 \
+            --repo faxtell/mawaru-ios \
+            --name Mawaru-unsigned-IPA \
+            --dir "$RUNNER_TEMP/out"
+          test -s "$RUNNER_TEMP/out/Mawaru-unsigned.ipa"
+          mv "$RUNNER_TEMP/out/Mawaru-unsigned.ipa" \
+             "$RUNNER_TEMP/out/Mawaru-v0.9.1-unsigned.ipa"
+          echo '88392365d9b4f6bdfb0475953a80d911ce7a73960d417e96baebde29c96a1a47  '"$RUNNER_TEMP/out/Mawaru-v0.9.1-unsigned.ipa" | sha256sum -c -
+          (cd "$RUNNER_TEMP/out" && zip -q -9 Mawaru-v0.9.1-unsigned.zip Mawaru-v0.9.1-unsigned.ipa)
+
+      - name: Publish directly as downloadable files on a public GitHub branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout --orphan ipa-downloads
+          git rm -rf . || true
+          git clean -fdx
+          cp "$RUNNER_TEMP/out/Mawaru-v0.9.1-unsigned.ipa" .
+          cp "$RUNNER_TEMP/out/Mawaru-v0.9.1-unsigned.zip" .
+          printf '%s\n' '# まわる v0.9.1 IPA 配布' '' \
+            'IPAは未署名です。インストール前に署名してください。' \
+            'これはソースコードのmainとは独立したファイル配布専用ブランチです。' \
+            > README.md
+          git add README.md Mawaru-v0.9.1-unsigned.ipa Mawaru-v0.9.1-unsigned.zip
+          git commit -m 'Publish v0.9.1 unsigned IPA for direct browser download'
+          git push --force origin HEAD:refs/heads/ipa-downloads
+
+      - name: Confirm published files and sizes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/faxtell/mawaru-ios/contents/Mawaru-v0.9.1-unsigned.ipa?ref=ipa-downloads" --jq '.size'
+          gh api "repos/faxtell/mawaru-ios/contents/Mawaru-v0.9.1-unsigned.zip?ref=ipa-downloads" --jq '.size'
